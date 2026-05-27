@@ -14,6 +14,7 @@ services:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      DATABASE_APP_KEY: ${DATABASE_APP_KEY}
       ADZUNA_APP_ID: ${ADZUNA_APP_ID}
       ADZUNA_APP_KEY: ${ADZUNA_APP_KEY}
       JSEARCH_APP_HOST: ${JSEARCH_APP_HOST}
@@ -23,6 +24,17 @@ services:
       - ./logs:/app/logs
     working_dir: /app
     command: ["python", "python/HelloWorld.py"]
+
+  jupyter:
+    image: jupyter/base-notebook
+    container_name: latam_jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./src:/home/jovyan/src
+    env_file:
+      - .env
 
   # ------------------- AIRFLOW -------------------
 
@@ -56,11 +68,23 @@ services:
     depends_on:
       airflow-postgres:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    command: ["bash", "-c", "airflow db migrate && airflow users create -u admin -p admin -f Admin -l User -r Admin -e admin@latam.local"]
+    entrypoint: /bin/bash
+    command: -c "
+      airflow db migrate &&
+      airflow users create \
+        --username ${AIRFLOW_ADMIN_USERNAME} \
+        --password ${AIRFLOW_ADMIN_PASSWORD} \
+        --firstname Admin \
+        --lastname User \
+        --role Admin \
+        --email ${AIRFLOW_ADMIN_EMAIL}"
+
 
   # ──────────────────────────────────────────
   # Airflow — Scheduler
@@ -96,6 +120,9 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+      AIRFLOW_ADMIN_EMAIL: ${AIRFLOW_ADMIN_EMAIL}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs

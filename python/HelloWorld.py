@@ -33,19 +33,19 @@ def test_neon():
 
         # Schémas disponibles
         cur.execute("""
-            SELECT schema_name
+            SELECT schema_name 
             FROM information_schema.schemata
-            WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
-            ORDER BY schema_name;
+            WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast');
         """)
         schemas = [row[0] for row in cur.fetchall()]
         log.info(f"  📂 Schémas : {schemas}")
 
         # Tables disponibles
         cur.execute("""
-            SELECT table_schema, table_name
+            SELECT table_schema, table_name 
             FROM information_schema.tables
-            WHERE table_schema IN ('analytics', 'ops')
+            WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+            AND table_type = 'BASE TABLE'
             ORDER BY table_schema, table_name;
         """)
         tables = cur.fetchall()
@@ -55,12 +55,22 @@ def test_neon():
         else:
             log.warning("  ⚠️  Aucune table trouvée — pense à exécuter 001_init.sql sur Neon")
 
+        # Contenu de la table test
+        cur.execute("SELECT id_test, nom, timestamp FROM test;")
+        rows = cur.fetchall()
+        if rows:
+            log.info(f"  🧪 Table test — {len(rows)} ligne(s) trouvée(s) :")
+            for id_test, nom, timestamp in rows:
+                log.info(f"     [{id_test}] {nom} — {timestamp}")
+        else:
+            log.warning("  ⚠️  Table test vide")
+
         cur.close()
         conn.close()
         return True
 
     except Exception as e:
-        log.error(f"  ❌ Échec connexion Neon : {e}")
+        log.error(f"  ❌ Erreur Neon : {e}")
         return False
 
 
