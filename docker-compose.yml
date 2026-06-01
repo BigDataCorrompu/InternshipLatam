@@ -31,7 +31,8 @@ services:
     volumes:
       - ./ingestion/python:/ingestion/python
     working_dir: /ingestion
-    command: ["python", "python/test_api.py", "--api", "careerjet"]
+    command: ["python", "python/src/database.py"]
+    # command: ["python", "python/test_api.py", "--mock"]
 
 
   # ──────────────────────────────────────────

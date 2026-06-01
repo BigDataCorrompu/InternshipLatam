@@ -73,6 +73,15 @@ CAREERJET_SEARCH = {
     "sort":          "date",
     "page_size":     50,
 }
+# Moins restrictif
+CAREERJET_SEARCH = {
+    "keywords":    "data engineer",
+    "location":    "Buenos Aires",
+    "locale_code": "es_AR",
+    "sort":        "date",
+    "page_size":   50,
+    # contract_type et work_hours supprimés
+}
 
 
 # ──────────────────────────────────────────

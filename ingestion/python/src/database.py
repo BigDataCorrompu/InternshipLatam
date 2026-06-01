@@ -26,7 +26,7 @@ class Database:
         )
 
 
-    def execute(self, query:str, params: tuple = None) -> list:
+    def execute(self, query:str, params: list = None) -> list:
         """ PERMET DE GERER UNE BDD LOCAL OU CLOUD (Actuellement uniquement cloud)"""
         #Execute HTTP NEON
         return self._execute_http(query, params)
@@ -34,24 +34,23 @@ class Database:
         # Execute local Database
 
 
-    def _execute_http(self, query: str, params: tuple = None) -> list:
+    def _execute_http(self, query: str, params: list = None) -> list:
         """Connexion via HTTP API Neon (port 443)."""
         try:
-            if params:
-                query = query % tuple(
-                    f"'{p}'" if isinstance(p, str) else str(p) for p in params
-                )
-
             url = f"https://{self.db_host}/sql"
             headers = {
                 "Content-Type": "application/json",
                 "Neon-Connection-String": self.database_url
             }
 
-            response = requests.post(url, json={"query": query}, headers=headers)
+            # ✅ params envoyés séparément dans le payload, jamais interpolés
+            payload = {"query": query}
+            if params:
+                payload["params"] = params
+
+            response = requests.post(url, json=payload, headers=headers)
             data = response.json()
 
-            # ── Vérification du status HTTP ──
             if response.status_code != 200:
                 log.error(f"❌ HTTP {response.status_code} : {data.get('message', 'Erreur inconnue')}")
                 raise Exception(f"HTTP {response.status_code} : {data.get('message')}")
@@ -63,46 +62,33 @@ class Database:
         except Exception as e:
             log.error(f"❌ HTTP Error : {e}")
             raise
-        
+                
     def bulk_insert(self, table: str, columns: list, data: list, batch_size: int = 3000) -> None:
-        """Bulk insert avec découpage automatique en batches et échappement sécurisé."""
-        
         total = len(data)
         inserted = 0
 
-        # Découpe data en chunks de batch_size
         for i in range(0, total, batch_size):
             chunk = data[i:i + batch_size]
-
-            values = []
-            for row in chunk:
-                row_formatted = []
-                for v in row:
-                    if v is None:
-                        row_formatted.append("NULL")
-                    elif isinstance(v, bool):
-                        row_formatted.append("TRUE" if v else "FALSE")
-                    elif isinstance(v, (int, float)):
-                        row_formatted.append(str(v))
-                    else:
-                        # Échappe les apostrophes en les doublant pour PostgreSQL
-                        escaped_str = str(v).replace("'", "''")
-                        row_formatted.append(f"'{escaped_str}'")
-                
-                values.append(f"({', '.join(row_formatted)})")
-
+            
             cols = ", ".join(f'"{c}"' for c in columns)
-            all_values = ", ".join(values)
-            query = f'INSERT INTO "{table}" ({cols}) VALUES {all_values};'
-
-            # Appel à votre méthode qui exécute la requête HTTP Neon
-            self.execute(query)
+            
+            # Paramètres liés : $1, $2, $3...
+            rows_placeholders = ", ".join(
+                f"({ ', '.join(f'${i * len(columns) + j + 1}' for j in range(len(columns))) })"
+                for i, _ in enumerate(chunk)
+            )
+            
+            query = f'INSERT INTO "{table}" ({cols}) VALUES {rows_placeholders};'
+            
+            # Aplatit toutes les valeurs en une seule liste
+            params = [None if v is None else v for row in chunk for v in row]
+            
+            self.execute(query, params)  # ← params passés séparément, jamais dans la string
             
             inserted += len(chunk)
             log.info(f"✅ Batch {i // batch_size + 1} OK ({inserted}/{total} lignes)")
 
         log.info(f"✅ Bulk insert terminé ({total} lignes en {-(-total // batch_size)} requêtes)")
-
 
 
 if __name__ == '__main__':
