@@ -1,0 +1,39 @@
+{
+  "test": "careerjet_pagination",
+  "timestamp": "2026-06-01T03:48:17",
+  "page_param": "page",
+  "status": "OK",
+  "error": null,
+  "max_pages": 3,
+  "pages": [
+    {
+      "page_counter": 1,
+      "results_on_page": 4,
+      "has_next_page": false,
+      "next_token": null,
+      "format": {
+        "hits": "int",
+        "jobs": {
+          "_type": "list",
+          "_length": 4,
+          "_item": {
+            "company": "str",
+            "date": "str",
+            "description": "str",
+            "locations": "str",
+            "salary": "str",
+            "site": "str",
+            "title": "str",
+            "url": "str"
+          }
+        },
+        "message": "str",
+        "pages": "int",
+        "response_time": "float",
+        "type": "str"
+      }
+    }
+  ],
+  "total_results": 4,
+  "stopped_because": "plus de page suivante"
+}

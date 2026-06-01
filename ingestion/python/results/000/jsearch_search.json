@@ -1,0 +1,42 @@
+{
+  "test": "jsearch_search",
+  "timestamp": "2026-06-01T03:12:08",
+  "callable": "search_jobs",
+  "args": [
+    "data science intern in Chile"
+  ],
+  "kwargs": {},
+  "status": "OK",
+  "error": null,
+  "result_count": 0,
+  "format": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "query": "str",
+      "num_pages": "int",
+      "country": "str",
+      "language": "str"
+    },
+    "data": {
+      "jobs": [
+        "<liste vide>"
+      ],
+      "cursor": "null"
+    }
+  },
+  "raw": {
+    "status": "OK",
+    "request_id": "c72684ad-46f9-4312-98be-12c108366ff2",
+    "parameters": {
+      "query": "data science intern in Chile",
+      "num_pages": 1,
+      "country": "us",
+      "language": "en"
+    },
+    "data": {
+      "jobs": [],
+      "cursor": null
+    }
+  }
+}

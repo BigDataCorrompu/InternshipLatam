@@ -1,0 +1,21 @@
+{
+  "test": "careerjet_search",
+  "timestamp": "2026-06-01T03:33:51",
+  "callable": "search_jobs",
+  "args": [],
+  "params": {
+    "keywords": "data engineer",
+    "location": "Buenos Aires",
+    "locale_code": "es_AR",
+    "contract_type": "i",
+    "work_hours": "f",
+    "sort": "date",
+    "page_size": 50
+  },
+  "status": "ERREUR",
+  "error": "HTTP 403 : {\n   \"error\" : \"Unauthorized access from IP 132.212.25.30\",\n   \"type\" : \"ERROR\"\n}\n",
+  "result_count": null,
+  "format": null,
+  "raw": null,
+  "traceback": "Traceback (most recent call last):\n  File \"/ingestion/python/test_api.py\", line 149, in run_endpoint_test\n    raw = func(*args, **kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/python/src/APIendpoint.py\", line 213, in search_jobs\n    raw = self._call('search', params)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/python/src/APIendpoint.py\", line 32, in _call\n    raise Exception(f\"HTTP {response.status_code} : {response.text}\")\nException: HTTP 403 : {\n   \"error\" : \"Unauthorized access from IP 132.212.25.30\",\n   \"type\" : \"ERROR\"\n}\n\n"
+}

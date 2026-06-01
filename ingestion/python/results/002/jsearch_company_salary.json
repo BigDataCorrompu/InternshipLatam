@@ -1,0 +1,29 @@
+{
+  "test": "jsearch_company_salary",
+  "timestamp": "2026-06-01T03:38:39",
+  "callable": "get_company_salary",
+  "args": [
+    "Globant",
+    "data engineer"
+  ],
+  "params": {
+    "location": "Buenos Aires, Argentina",
+    "location_type": "CITY",
+    "years_of_experience": "LESS_THAN_ONE"
+  },
+  "status": "OK",
+  "error": null,
+  "result_count": 0,
+  "format": {
+    "status": "str",
+    "request_id": "str",
+    "data": [
+      "<liste vide>"
+    ]
+  },
+  "raw": {
+    "status": "OK",
+    "request_id": "963a2695-4b89-4e70-87bf-9c18b7825d7d",
+    "data": []
+  }
+}

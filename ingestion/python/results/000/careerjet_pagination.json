@@ -1,0 +1,11 @@
+{
+  "test": "careerjet_pagination",
+  "timestamp": "2026-06-01T03:13:03",
+  "status": "ERREUR",
+  "error": "HTTP 401 : {\n   \"error\" : \"Invalid API key provided\",\n   \"type\" : \"ERROR\"\n}\n",
+  "max_pages": 3,
+  "pages": [],
+  "total_results": 0,
+  "stopped_because": null,
+  "traceback": "Traceback (most recent call last):\n  File \"/ingestion/python/test_api.py\", line 144, in test_pagination\n    raw = search_func(page=page_token, **kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/python/src/APIendpoint.py\", line 192, in search_jobs\n    raw = self._call('search', params)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/python/src/APIendpoint.py\", line 28, in _call\n    raise Exception(f\"HTTP {response.status_code} : {response.text}\")\nException: HTTP 401 : {\n   \"error\" : \"Invalid API key provided\",\n   \"type\" : \"ERROR\"\n}\n\n"
+}

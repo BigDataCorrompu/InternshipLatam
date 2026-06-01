@@ -1,0 +1,16 @@
+{
+  "test": "careerjet_search",
+  "timestamp": "2026-06-01T03:13:02",
+  "callable": "search_jobs",
+  "args": [],
+  "kwargs": {
+    "keywords": "data science",
+    "location": "Chile"
+  },
+  "status": "ERREUR",
+  "error": "HTTP 401 : {\n   \"error\" : \"Invalid API key provided\",\n   \"type\" : \"ERROR\"\n}\n",
+  "result_count": null,
+  "format": null,
+  "raw": null,
+  "traceback": "Traceback (most recent call last):\n  File \"/ingestion/python/test_api.py\", line 96, in run_endpoint_test\n    raw = func(*args, **kwargs)\n          ^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/python/src/APIendpoint.py\", line 192, in search_jobs\n    raw = self._call('search', params)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/python/src/APIendpoint.py\", line 28, in _call\n    raise Exception(f\"HTTP {response.status_code} : {response.text}\")\nException: HTTP 401 : {\n   \"error\" : \"Invalid API key provided\",\n   \"type\" : \"ERROR\"\n}\n\n"
+}

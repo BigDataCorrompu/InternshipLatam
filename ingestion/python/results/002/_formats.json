@@ -1,0 +1,272 @@
+{
+  "jsearch_search": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "query": "str",
+      "num_pages": "int",
+      "date_posted": "str",
+      "employment_types": {
+        "_type": "list",
+        "_length": 2,
+        "_item": "str"
+      },
+      "country": "str",
+      "language": "str"
+    },
+    "data": {
+      "jobs": {
+        "_type": "list",
+        "_length": 10,
+        "_item": {
+          "job_id": "str",
+          "job_title": "str",
+          "employer_name": "str",
+          "employer_logo": "str",
+          "employer_website": "str",
+          "job_publisher": "str",
+          "job_employment_type": "str",
+          "job_employment_types": {
+            "_type": "list",
+            "_length": 1,
+            "_item": "<str>"
+          },
+          "job_apply_link": "str",
+          "job_apply_is_direct": "bool",
+          "apply_options": {
+            "_type": "list",
+            "_length": 1,
+            "_item": "<dict>"
+          },
+          "job_description": "str",
+          "job_is_remote": "bool",
+          "job_posted_at": "str",
+          "job_posted_at_timestamp": "null",
+          "job_posted_at_datetime_utc": "null",
+          "job_location": "str",
+          "job_city": "null",
+          "job_state": "null",
+          "job_country": "null",
+          "job_latitude": "null",
+          "job_longitude": "null",
+          "job_benefits": "null",
+          "job_benefits_strings": "null",
+          "job_google_link": "str",
+          "job_salary": "null",
+          "job_salary_string": "null",
+          "job_min_salary": "null",
+          "job_max_salary": "null",
+          "job_salary_period": "null",
+          "job_highlights": {},
+          "job_onet_soc": "null",
+          "job_onet_job_zone": "null",
+          "employer_reviews": "null"
+        }
+      },
+      "cursor": "str"
+    }
+  },
+  "jsearch_details": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "job_id": "str",
+      "country": "str",
+      "language": "str"
+    },
+    "data": {
+      "_type": "list",
+      "_length": 1,
+      "_item": {
+        "job_id": "str",
+        "job_title": "str",
+        "employer_name": "str",
+        "employer_logo": "str",
+        "employer_website": "str",
+        "job_publisher": "str",
+        "job_employment_type": "str",
+        "job_employment_types": {
+          "_type": "list",
+          "_length": 1,
+          "_item": "str"
+        },
+        "job_apply_link": "str",
+        "job_apply_is_direct": "bool",
+        "apply_options": {
+          "_type": "list",
+          "_length": 2,
+          "_item": {
+            "publisher": "<str>",
+            "apply_link": "<str>",
+            "is_direct": "<bool>"
+          }
+        },
+        "job_description": "str",
+        "job_is_remote": "null",
+        "job_posted_at": "str",
+        "job_posted_at_timestamp": "int",
+        "job_posted_at_datetime_utc": "str",
+        "job_location": "str",
+        "job_city": "str",
+        "job_state": "str",
+        "job_country": "str",
+        "job_latitude": "float",
+        "job_longitude": "float",
+        "job_benefits": "null",
+        "job_google_link": "str",
+        "job_salary": "null",
+        "job_min_salary": "null",
+        "job_max_salary": "null",
+        "job_salary_period": "null",
+        "job_highlights": {},
+        "job_onet_soc": "str",
+        "job_onet_job_zone": "str",
+        "work_arrangement": "str",
+        "seniority_level": "str",
+        "required_experience_years": "int",
+        "education_required": {
+          "level": "null",
+          "field": "null"
+        },
+        "visa_sponsorship": "null",
+        "relocation_required": "bool",
+        "relocation_assistance": "null",
+        "contract_duration": "null",
+        "start_date": "null",
+        "required_technologies": {
+          "_type": "list",
+          "_length": 8,
+          "_item": "str"
+        },
+        "preferred_technologies": [
+          "<liste vide>"
+        ],
+        "methodologies": [
+          "<liste vide>"
+        ],
+        "industry": "str",
+        "job_function": "str",
+        "has_management_responsibilities": "bool",
+        "ai_ml_involved": "bool",
+        "benefits_extended": {
+          "_type": "list",
+          "_length": 8,
+          "_item": "str"
+        },
+        "soft_skills": {
+          "_type": "list",
+          "_length": 2,
+          "_item": "str"
+        }
+      }
+    }
+  },
+  "jsearch_salary": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "job_title": "str",
+      "location": "str",
+      "location_type": "str",
+      "years_of_experience": "str"
+    },
+    "data": {
+      "_type": "list",
+      "_length": 1,
+      "_item": {
+        "location": "str",
+        "job_title": "str",
+        "min_salary": "float",
+        "max_salary": "int",
+        "median_salary": "float",
+        "min_base_salary": "int",
+        "max_base_salary": "int",
+        "median_base_salary": "int",
+        "min_additional_pay": "float",
+        "max_additional_pay": "int",
+        "median_additional_pay": "float",
+        "salary_period": "str",
+        "salary_currency": "str",
+        "salary_count": "int",
+        "salaries_updated_at": "str",
+        "publisher_name": "str",
+        "publisher_link": "str",
+        "confidence": "str"
+      }
+    }
+  },
+  "jsearch_company_salary": {
+    "status": "str",
+    "request_id": "str",
+    "data": [
+      "<liste vide>"
+    ]
+  },
+  "jsearch_pagination": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "query": "str",
+      "num_pages": "int",
+      "date_posted": "str",
+      "employment_types": {
+        "_type": "list",
+        "_length": 2,
+        "_item": "str"
+      },
+      "country": "str",
+      "language": "str"
+    },
+    "data": {
+      "jobs": {
+        "_type": "list",
+        "_length": 10,
+        "_item": {
+          "job_id": "str",
+          "job_title": "str",
+          "employer_name": "str",
+          "employer_logo": "str",
+          "employer_website": "str",
+          "job_publisher": "str",
+          "job_employment_type": "str",
+          "job_employment_types": {
+            "_type": "list",
+            "_length": 1,
+            "_item": "<str>"
+          },
+          "job_apply_link": "str",
+          "job_apply_is_direct": "bool",
+          "apply_options": {
+            "_type": "list",
+            "_length": 1,
+            "_item": "<dict>"
+          },
+          "job_description": "str",
+          "job_is_remote": "bool",
+          "job_posted_at": "str",
+          "job_posted_at_timestamp": "null",
+          "job_posted_at_datetime_utc": "null",
+          "job_location": "str",
+          "job_city": "null",
+          "job_state": "null",
+          "job_country": "null",
+          "job_latitude": "null",
+          "job_longitude": "null",
+          "job_benefits": "null",
+          "job_benefits_strings": "null",
+          "job_google_link": "str",
+          "job_salary": "null",
+          "job_salary_string": "null",
+          "job_min_salary": "null",
+          "job_max_salary": "null",
+          "job_salary_period": "null",
+          "job_highlights": {},
+          "job_onet_soc": "null",
+          "job_onet_job_zone": "null",
+          "employer_reviews": "null"
+        }
+      },
+      "cursor": "str"
+    }
+  }
+}

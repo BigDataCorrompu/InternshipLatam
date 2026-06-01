@@ -1,0 +1,37 @@
+{
+  "test": "jsearch_salary",
+  "timestamp": "2026-06-01T03:12:09",
+  "callable": "get_salary",
+  "args": [
+    "Santiago, Chile",
+    "Data Scientist"
+  ],
+  "kwargs": {},
+  "status": "OK",
+  "error": null,
+  "result_count": null,
+  "format": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "job_title": "str",
+      "location": "str",
+      "location_type": "str",
+      "years_of_experience": "null"
+    },
+    "data": [
+      "<liste vide>"
+    ]
+  },
+  "raw": {
+    "status": "OK",
+    "request_id": "38221471-7897-45cb-b572-ce9ec898f639",
+    "parameters": {
+      "job_title": "data scientist",
+      "location": "santiago, chile",
+      "location_type": "ANY",
+      "years_of_experience": null
+    },
+    "data": []
+  }
+}

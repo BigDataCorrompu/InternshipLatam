@@ -1,0 +1,73 @@
+{
+  "jsearch_search": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "query": "str",
+      "num_pages": "int",
+      "country": "str",
+      "language": "str"
+    },
+    "data": {
+      "jobs": [
+        "<liste vide>"
+      ],
+      "cursor": "null"
+    }
+  },
+  "jsearch_salary": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "job_title": "str",
+      "location": "str",
+      "location_type": "str",
+      "years_of_experience": "null"
+    },
+    "data": [
+      "<liste vide>"
+    ]
+  },
+  "jsearch_company_salary": {
+    "status": "str",
+    "request_id": "str",
+    "data": {
+      "_type": "list",
+      "_length": 1,
+      "_item": {
+        "location": "str",
+        "job_title": "str",
+        "company": "str",
+        "min_salary": "float",
+        "max_salary": "float",
+        "median_salary": "float",
+        "min_base_salary": "float",
+        "max_base_salary": "float",
+        "median_base_salary": "float",
+        "min_additional_pay": "float",
+        "max_additional_pay": "float",
+        "median_additional_pay": "float",
+        "salary_period": "str",
+        "salary_currency": "str",
+        "confidence": "str",
+        "salary_count": "int"
+      }
+    }
+  },
+  "jsearch_pagination": {
+    "status": "str",
+    "request_id": "str",
+    "parameters": {
+      "query": "str",
+      "num_pages": "int",
+      "country": "str",
+      "language": "str"
+    },
+    "data": {
+      "jobs": [
+        "<liste vide>"
+      ],
+      "cursor": "null"
+    }
+  }
+}

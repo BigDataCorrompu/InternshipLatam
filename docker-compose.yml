@@ -13,12 +13,15 @@ services:
     #   airflow-init:
     #     condition: service_completed_successfully
     environment:
+      PYTHONPATH: /app/python/src  
       DATABASE_URL: ${DATABASE_URL}
       DATABASE_APP_KEY: ${DATABASE_APP_KEY}
-      ADZUNA_APP_ID: ${ADZUNA_APP_ID}
-      ADZUNA_APP_KEY: ${ADZUNA_APP_KEY}
       JSEARCH_APP_HOST: ${JSEARCH_APP_HOST}
       JSEARCH_APP_KEY: ${JSEARCH_APP_KEY}
+      CAREERJET_APP_KEY: ${CAREERJET_APP_KEY}
+      CAREERJET_USER_AGENT: ${CAREERJET_USER_AGENT}
+      CAREERJET_REFERER: ${CAREERJET_REFERER}
+      SERVER_IP: ${SERVER_IP}
       DB_HOST: ${DB_HOST}
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
@@ -26,9 +29,9 @@ services:
       DB_SSLMODE: ${DB_SSLMODE}
       DB_CHANNELBIDING: ${DB_CHANNELBIDING}
     volumes:
-      - ./ingestion/python:/app/python
-    working_dir: /app
-    command: ["python", "python/HelloWorld.py"]
+      - ./ingestion/python:/ingestion/python
+    working_dir: /ingestion
+    command: ["python", "python/test_api.py", "--api", "careerjet"]
 
 
   # ──────────────────────────────────────────

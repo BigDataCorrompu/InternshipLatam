@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY python/ ./python/
+# Au lieu de : COPY python/ ./python/
+COPY ingestion/python/ ./python/
 
-CMD ["python", "python/HelloWorld.py"]
+CMD ["python", "ingestion/python/HelloWorld.py"]

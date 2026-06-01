@@ -1,0 +1,12 @@
+{
+  "test": "careerjet_pagination",
+  "timestamp": "2026-06-01T03:33:52",
+  "page_param": "page",
+  "status": "ERREUR",
+  "error": "HTTP 403 : {\n   \"error\" : \"Unauthorized access from IP 132.212.25.30\",\n   \"type\" : \"ERROR\"\n}\n",
+  "max_pages": 3,
+  "pages": [],
+  "total_results": 0,
+  "stopped_because": null,
+  "traceback": "Traceback (most recent call last):\n  File \"/ingestion/python/test_api.py\", line 200, in test_pagination\n    raw = search_func(**kwargs)                     # page 1 : sans paramètre de pagination\n          ^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/python/src/APIendpoint.py\", line 213, in search_jobs\n    raw = self._call('search', params)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/python/src/APIendpoint.py\", line 32, in _call\n    raise Exception(f\"HTTP {response.status_code} : {response.text}\")\nException: HTTP 403 : {\n   \"error\" : \"Unauthorized access from IP 132.212.25.30\",\n   \"type\" : \"ERROR\"\n}\n\n"
+}

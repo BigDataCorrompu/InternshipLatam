@@ -1,0 +1,159 @@
+{
+  "test": "jsearch_pagination",
+  "timestamp": "2026-06-01T03:38:56",
+  "page_param": "cursor",
+  "status": "OK",
+  "error": null,
+  "max_pages": 3,
+  "pages": [
+    {
+      "page_counter": 1,
+      "results_on_page": 10,
+      "has_next_page": true,
+      "next_token": "EswHCowHQU1uMy15UUNibUlWSzZuZ0czVlNSY0FrMmVJQXJSUWM1YkthLWNLMDRzQW9XenNxclFRQms1Z2k5WE8wYUN3UXZsQ3lKejVxYVBoazRCbEFxU0VSRTU2NDBjcTltOC1LOEYxZHVyWkRwM1kxd255OWZFWi1wZlZOV0hTT3c2WGNHU2g2aEJqNnJ6YUhGT2hmcEFCOGlfWGlSWGRLNTM4c2xLYUdzMXhaU1J1Yi1WWjlfZW01S2Noa044OHM1MEpJMjJyODRuQWpLZE1qMDh6d1RiLTRnRm5FbnhGZ2JhdVdlSmFVWWZNaTZVeE1PdV9EOGNON1BFQTg2akRaWFotSU8yWFZobTRmYUpRMDhjNmhtVlY0WFo5VmFLb19tMXlBS21oMGN4Y2JIakw1dTI1XzJHYXhMNEd2dERWdklkMnd6X25HcExrSkRQQUdmQURyMElkS1ZCdjgza1RBemthU2ZVcVVQRVZrOFRMbUJ4Q2dGX2x5SERTU1F0SmFMLVMxSUtMcXFJN0Y5WDlBdU9VYU9zLWJ4R0lsVk9jZnpuQi1YZGFqMzQxd2tCM214Z1NxWndYSW5sbjBxR1Z6UVJTbktfZXk3X3hCSE05THF0T0hCYVhzTVNnOFVHbW5rWVN6aHJRNHF1OWZtX0Y2WWtxcWFZQ3gtZlI5M3VhMEpnMGR5Q1JHZF9uUHNUZmZuTDdRSy13SFNmZ2Nwa3ZsYkVjVGhEZk9ZSzVGMlAzaXNDM0NsM09wdlMyWWNfM1dxbVB4LXMteVVJNzI2Q3RxVnFjVENCOEl3dV9iZmlRXzdEWHBLakZxM2ktUFR2T3dLR09iZXVOOFFTZ3NNckRYU3R2X3NjWjAtbFB5NEFiYm9vVHZmRi13dkpBNzZ6aWtVcHd1bThSVVAya0NydkFGcXdyVThJa0pKb0VHTUJZWl9WaEVQaDktS1RleFFEelV6U1dKaF84WXAwckNwaEk4Wk94RXdMdGphUjQ1amJiM2lpcHdXT2lFMXpQV09HWGFsTFdmOHNQWlpILWN2TlQzQlQtbkVHTHg4NlJkNG0wQldQZXlfb1d4WXBtRElvUVdqRjg2ZU1NeGlQZ2VpUml3RHhUWXF5eFpuM1FSNDJGSGIwQUFwWVFMY2c0SkxVY0ZXWUhJUVhzbUJyZnpfUG9DeXNDcnpBN3B4M1I1blpNcEcxMmh2bG14T19rOE5rSnISFzBfNGNhcFRjTWMtSDl1OFAydHYyLUFvGiJBSktMRm1MTDRjYXNKcVR4WE81c2JNX2ExTWlERWpwTGd3",
+      "format": {
+        "status": "str",
+        "request_id": "str",
+        "parameters": {
+          "query": "str",
+          "num_pages": "int",
+          "date_posted": "str",
+          "employment_types": {
+            "_type": "list",
+            "_length": 2,
+            "_item": "str"
+          },
+          "country": "str",
+          "language": "str"
+        },
+        "data": {
+          "jobs": {
+            "_type": "list",
+            "_length": 10,
+            "_item": {
+              "job_id": "str",
+              "job_title": "str",
+              "employer_name": "str",
+              "employer_logo": "str",
+              "employer_website": "str",
+              "job_publisher": "str",
+              "job_employment_type": "str",
+              "job_employment_types": {
+                "_type": "list",
+                "_length": 1,
+                "_item": "<str>"
+              },
+              "job_apply_link": "str",
+              "job_apply_is_direct": "bool",
+              "apply_options": {
+                "_type": "list",
+                "_length": 1,
+                "_item": "<dict>"
+              },
+              "job_description": "str",
+              "job_is_remote": "bool",
+              "job_posted_at": "str",
+              "job_posted_at_timestamp": "null",
+              "job_posted_at_datetime_utc": "null",
+              "job_location": "str",
+              "job_city": "null",
+              "job_state": "null",
+              "job_country": "null",
+              "job_latitude": "null",
+              "job_longitude": "null",
+              "job_benefits": "null",
+              "job_benefits_strings": "null",
+              "job_google_link": "str",
+              "job_salary": "null",
+              "job_salary_string": "null",
+              "job_min_salary": "null",
+              "job_max_salary": "null",
+              "job_salary_period": "null",
+              "job_highlights": {},
+              "job_onet_soc": "null",
+              "job_onet_job_zone": "null",
+              "employer_reviews": "null"
+            }
+          },
+          "cursor": "str"
+        }
+      }
+    },
+    {
+      "page_counter": 2,
+      "results_on_page": 6,
+      "has_next_page": false,
+      "next_token": null,
+      "format": {
+        "status": "str",
+        "request_id": "str",
+        "parameters": {
+          "query": "str",
+          "cursor": "str",
+          "num_pages": "int",
+          "date_posted": "str",
+          "employment_types": {
+            "_type": "list",
+            "_length": 2,
+            "_item": "str"
+          },
+          "country": "str",
+          "language": "str"
+        },
+        "data": {
+          "jobs": {
+            "_type": "list",
+            "_length": 6,
+            "_item": {
+              "job_id": "str",
+              "job_title": "str",
+              "employer_name": "str",
+              "employer_logo": "str",
+              "employer_website": "str",
+              "job_publisher": "str",
+              "job_employment_type": "str",
+              "job_employment_types": {
+                "_type": "list",
+                "_length": 1,
+                "_item": "<str>"
+              },
+              "job_apply_link": "str",
+              "job_apply_is_direct": "bool",
+              "apply_options": {
+                "_type": "list",
+                "_length": 1,
+                "_item": "<dict>"
+              },
+              "job_description": "str",
+              "job_is_remote": "bool",
+              "job_posted_at": "str",
+              "job_posted_at_timestamp": "null",
+              "job_posted_at_datetime_utc": "null",
+              "job_location": "str",
+              "job_city": "str",
+              "job_state": "str",
+              "job_country": "str",
+              "job_latitude": "float",
+              "job_longitude": "float",
+              "job_benefits": "null",
+              "job_benefits_strings": "null",
+              "job_google_link": "str",
+              "job_salary": "null",
+              "job_salary_string": "null",
+              "job_min_salary": "null",
+              "job_max_salary": "null",
+              "job_salary_period": "null",
+              "job_highlights": {},
+              "job_onet_soc": "null",
+              "job_onet_job_zone": "null",
+              "employer_reviews": "null"
+            }
+          },
+          "cursor": "null"
+        }
+      }
+    }
+  ],
+  "total_results": 16,
+  "stopped_because": "plus de page suivante"
+}
