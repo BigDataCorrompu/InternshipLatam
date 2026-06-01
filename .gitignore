@@ -16,6 +16,9 @@ venv/
 # ── Logs ─────────────────────────────────────
 logs/
 *.log
+
+ingestion/python/results/
+*.json
  
 # ── Docker ───────────────────────────────────
 docker-compose.override.yml
