@@ -63,7 +63,7 @@ class Database:
             log.error(f"❌ HTTP Error : {e}")
             raise
                 
-    def bulk_insert(self, table: str, columns: list, data: list, batch_size: int = 3000) -> None:
+    def bulk_insert(self, table: str, columns: list, data: list, batch_size: int = 500) -> None:
         total = len(data)
         inserted = 0
 
@@ -83,7 +83,7 @@ class Database:
             # Aplatit toutes les valeurs en une seule liste
             params = [None if v is None else v for row in chunk for v in row]
             
-            self.execute(query, params)  # ← params passés séparément, jamais dans la string
+            self.execute(query, params)  #  params passés séparément, jamais dans la string
             
             inserted += len(chunk)
             log.info(f"✅ Batch {i // batch_size + 1} OK ({inserted}/{total} lignes)")
@@ -114,7 +114,7 @@ if __name__ == '__main__':
 
     # ── Test 4 : BULK INSERT 1500 lignes ──────────────
     print("\n--- TEST 4 : BULK INSERT 1500 lignes ---")
-    data_large = [(f"bulk{i}", "2026-05-29") for i in range(15)]
+    data_large = [(f"bulk{i}", "2026-05-29") for i in range(1500)]
     db.bulk_insert("test", ["Nom", "timestamp"], data_large)
     rows = db.execute("SELECT COUNT(*) FROM test WHERE \"Nom\" LIKE 'bulk%';")
     print(f"  ✅ {rows[0]['count']} ligne(s) bulk trouvée(s)")
