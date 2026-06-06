@@ -13,4 +13,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Au lieu de : COPY python/ ./python/
 COPY ingestion/python/ ./python/
 
-CMD ["python", "ingestion/python/HelloWorld.py"]
+CMD ["python", "python/src/Database.py"]

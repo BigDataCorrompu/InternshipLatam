@@ -3,16 +3,18 @@ import os
 import requests
 import base64
 from typing import Callable
-
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 
 
 # ──────────────────────────────────────────
 # Parent API
 # ──────────────────────────────────────────
-class BaseAPI(ABC):
+class API(ABC):
     # Nom du paramètre de pagination envoyé à l'API.
     # Surchargé par chaque sous-classe ("cursor" pour Jsearch, "page" pour CareerJet).
     PAGE_PARAM = "page"
+
 
     def __init__(self, api_key):
         self.api_key = api_key
@@ -72,14 +74,14 @@ class BaseAPI(ABC):
         pass
 
 
-class JobAPI(BaseAPI):
+class JobAPI(API):
     @abstractmethod
     def search_jobs(self):
         pass
 
 
 
-class CompanyAPI(BaseAPI):
+class CompanyAPI(API):
     @abstractmethod
     def search_company(self):
         pass
@@ -87,7 +89,7 @@ class CompanyAPI(BaseAPI):
 
 
 # ──────────────────────────────────────────
-# Jsearch/CareerJet/OpenCorporate API
+# Jsearch/CareerJet
 # ──────────────────────────────────────────
 class JsearchAPI(JobAPI):
     BASE_URL = "https://jsearch.p.rapidapi.com"
@@ -100,8 +102,8 @@ class JsearchAPI(JobAPI):
     }
 
 
-    def __init__(self):
-        super().__init__(os.getenv('JSEARCH_APP_KEY'))
+    def __init__(self, api_key: str = None):
+        super().__init__(api_key or os.getenv('JSEARCH_APP_KEY'))
         self.headers = {
             "Content-Type": "application/json",
             "x-rapidapi-host": "jsearch.p.rapidapi.com",
@@ -182,8 +184,8 @@ class CareerJetAPI(JobAPI):
     }
 
 
-    def __init__(self):
-        super().__init__(os.getenv('CAREERJET_APP_KEY'))
+    def __init__(self, api_key: str=None, daysMaxOffer: int=3):
+        super().__init__(api_key or os.getenv('CAREERJET_APP_KEY'))
         credentials = base64.b64encode(f"{self.api_key}:".encode()).decode()
         self.user_ip    = os.getenv('SERVER_IP')
         self.user_agent = os.getenv('CAREERJET_USER_AGENT', 'InternshipLatam/1.0')
@@ -195,15 +197,30 @@ class CareerJetAPI(JobAPI):
         if self.referer:
             self.headers["Referer"] = self.referer
 
+
+        self.daysMaxOffer = daysMaxOffer
+        
+
     # ___________ PAGINATION ___________
-    def _extract_results(self, raw: dict):
+    def _extract_results(self, raw: dict) -> str:
         return raw.get("jobs", [])
 
-    def _has_next_page(self, raw: dict, page):
-        return page < raw.get("pages", 1)
+    def _has_next_page(self, raw: dict, page) -> bool:
+        if page >= raw.get("pages", 1):
+            return False
+        jobs = raw.get("jobs")
+        if not jobs:  # Prevent index error
+            return False
+        last_date = parsedate_to_datetime(jobs[-1]['date'])   
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.daysMaxOffer)
+        return last_date >= cutoff         # return if we are still in the desired plage
 
-    def _next_page(self, raw: dict, page):
+    def _next_page(self, raw: dict, page) -> int:
         return page + 1
+    
+    def setDaysMaxOffer(self, days: int=3):
+        self.daysMaxOffer = days
+
 
     # ___________ ENDPOINT ___________
     def search_jobs(self, paginate: bool=False, max_pages: int=None, **kwargs):

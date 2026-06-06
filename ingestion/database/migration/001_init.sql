@@ -1,20 +1,21 @@
+-- _______ Create Schema _______
+CREATE SCHEMA IF NOT EXISTS analytics;
 
 -- _______ Clean up existing tables to ensure a fresh state _______ 
-DROP TABLE IF EXISTS analytics.job_offer
+DROP TABLE IF EXISTS analytics.job_offer;
 
 -- _______ Create structural tables _______
 
--- Offer common to Jsearch and CareerJet
-DROP TABLE IF EXISTS analytics.job_offer;
 
 CREATE TABLE analytics.job_offer (
     -- Identifiants
-    job_id          VARCHAR(50)     PRIMARY KEY,        -- JSearch ~32 chars, CJ hash
-    source          VARCHAR(15)     NOT NULL,           -- "jsearch" | "careerjet"
+    id_job          VARCHAR(50)     PRIMARY KEY,        -- JSearch ~32 chars, CJ hash
+    api_source          VARCHAR(15)     NOT NULL,           -- "jsearch" | "careerjet"
 
     -- Offre
     job_title       VARCHAR(150),                       -- max ~100 chars en pratique
     contract_type   VARCHAR(20),                        -- "INTERN" | "FULLTIME" | null
+    job_publisher   VARCHAR(100),
 
     -- Entreprise
     company         VARCHAR(100),                       -- CJ max 8 chars, JS plus long
@@ -30,11 +31,13 @@ CREATE TABLE analytics.job_offer (
 
     -- Candidature
     offer_url       VARCHAR(300),                       -- CJ url = 263 chars fixes
-    apply_options   TEXT,                               -- JSON sérialisé, null CJ
+    is_direct       BOOLEAN,
     source_platform VARCHAR(100),                       -- null CJ (site vide)
 
     -- Description
     offer_description TEXT,                             -- CJ ~300 chars, JS beaucoup plus long
+    job_highlights   TEXT,
+    experience_level VARCHAR(15),
 
     -- Salaire
     salary_raw      VARCHAR(200),                       -- CJ toujours vide
