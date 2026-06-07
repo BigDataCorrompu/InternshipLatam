@@ -1,15 +1,15 @@
 -- _______ Create Schema _______
-CREATE SCHEMA IF NOT EXISTS analytics;
+CREATE SCHEMA IF NOT EXISTS raw;
 
 -- _______ Clean up existing tables to ensure a fresh state _______ 
-DROP TABLE IF EXISTS analytics.job_offer;
+DROP TABLE IF EXISTS raw.job_offer;
 
 -- _______ Create structural tables _______
 
 
-CREATE TABLE analytics.job_offer (
+CREATE TABLE raw.job_offer (
     -- Identifiants
-    id_job          VARCHAR(50)     PRIMARY KEY,        -- JSearch ~32 chars, CJ hash
+    id_job          VARCHAR(50),        -- JSearch ~32 chars, CJ hash
     api_source          VARCHAR(15)     NOT NULL,           -- "jsearch" | "careerjet"
 
     -- Offre
@@ -38,6 +38,7 @@ CREATE TABLE analytics.job_offer (
     offer_description TEXT,                             -- CJ ~300 chars, JS beaucoup plus long
     job_highlights   TEXT,
     experience_level VARCHAR(15),
+    search_language VARCHAR(5),                         -- 'es' | 'en' | 'fr'
 
     -- Salaire
     salary_raw      VARCHAR(200),                       -- CJ toujours vide

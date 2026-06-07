@@ -38,8 +38,9 @@ class JobOffer:
 
     # Description
     offer_description: str | None = None
-    job_highlights:    str | None = None      # JSON sérialisé
-    experience_level:  str | None = None  # ajout
+    job_highlights:    str | None = None        # JSON sérialisé
+    experience_level:  str | None = None        # ajout
+    search_language:   str | None = None        # ajout
 
     # Salaire
     salary_raw:       str | None = None
@@ -58,7 +59,7 @@ class Mapper(ABC):
         self.source = source
 
     @abstractmethod 
-    def normalise(self, raw: dict) -> tuple:
+    def normalise(self, data: dict, metaData: dict) -> tuple:
         pass
 
 
@@ -66,16 +67,21 @@ class Mapper(ABC):
 class JobMapper(Mapper):
     @staticmethod
     def getColumns(dataclass: Type[JobOffer]=JobOffer) -> list:
+        """ Return a list of columns structured in JobOffer"""
         return [f.name for f in fields(dataclass)]
 
     def getJobs(self, raw:dict) -> list:
-        """ return a list of tuples representing each lines in databases"""
+        """ Return a list of tuples representing each lines in databases"""
         data = self._findJobs(raw)
-        jobs = [self.normalise(job) for job in data]
+        metaData = self._findMetaData(raw)
+        jobs = [self.normalise(job, metaData) for job in data]
         return jobs
     
     def getData(self, raw: dict) -> dict:
-        """ Return dictionnary : columns & data ready to bulk_insert into database"""
+        """ 
+        Return dictionnary : columns & data
+        READY TO bulk_insert INTO DATABASE
+        """
         jobs = self.getJobs(raw)
         return {
             "columns"   : self.getColumns(),
@@ -87,6 +93,10 @@ class JobMapper(Mapper):
         """ Find jobs in the raw file """
         pass
 
+    @abstractmethod
+    def _findMetaData(self, raw: dict) -> dict:
+        pass
+
 class CareerjetMapper(JobMapper):
     def __init__(self):
         super().__init__(source='careerjet')
@@ -94,9 +104,12 @@ class CareerjetMapper(JobMapper):
     def _findJobs(self, raw:dict) -> dict:
         return raw.get("raw", {}).get("jobs", [])
     
-    def normalise(self, data: dict) -> tuple:
+    def _findMetaData(self, raw: dict) -> dict:
+        pass
+    
+    def normalise(self, data: dict, metaData: dict) -> tuple:
         return JobOffer(
-            id_job            = "cj_" + hashlib.md5(data.get("url", "").encode()).hexdigest()[:20],
+            id_job            = "cj_" + hashlib.md5(data.get("url", "").encode()).hexdigest(),
             api_source        = self.source,
             job_title         = data.get("title"),
             contract_type     = None,                    # pas disponible Careerjet
@@ -114,7 +127,8 @@ class CareerjetMapper(JobMapper):
             source_platform   = data.get("site") or None,  # souvent vide → None
             offer_description = data.get("description"),
             job_highlights    = None,
-            experience_level  = None,
+            experience_level  = metaData.get("PLACEHOLDER"),
+            search_language   = metaData.get("PLACEHOLDER"),
             salary_raw        = data.get("salary") or None,  # souvent vide → None
             salary_min        = None,                    # pas structuré Careerjet
             salary_max        = None,
@@ -132,16 +146,20 @@ class CareerjetMapper(JobMapper):
             return parsedate_to_datetime(date_str).isoformat()
         except:
             return None
+        
+    
 
 class JsearchMapper(JobMapper):
-    def __init__(self, experience_level: str=None):
+    def __init__(self):
         super().__init__(source='jsearch')
-        self.experience_level = experience_level
 
     def _findJobs(self, raw:dict) -> list:
         return raw.get("raw", {}).get("data", {}).get("jobs", [])
+    
+    def _findMetaData(self, raw: dict) -> dict:
+        pass
 
-    def normalise(self, data: dict) -> tuple:
+    def normalise(self, data: dict, metaData: dict) -> tuple:
         types     = data.get("job_employment_types", [])
         highlights = data.get("job_highlights")
 
@@ -164,7 +182,8 @@ class JsearchMapper(JobMapper):
             source_platform   = data.get("job_publisher"),
             offer_description = self._extract_description(data.get("job_description")),
             job_highlights    = json.dumps(highlights) if highlights else None,
-            experience_level  = self.experience_level,
+            experience_level  = metaData.get("PLACEHOLDER"),
+            search_language   = metaData.get("PLACEHOLDER"),
             salary_raw        = data.get("job_salary_string"),
             salary_min        = data.get("job_min_salary"),
             salary_max        = data.get("job_max_salary"),
