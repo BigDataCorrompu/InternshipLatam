@@ -1,44 +1,5 @@
 services:
 
-  # ──────────────────────────────────────────
-  # Environnement Python
-  # ──────────────────────────────────────────
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: latam_worker
-    restart: "no"
-    # depends_on:
-    #   airflow-init:
-    #     condition: service_completed_successfully
-    environment:
-      PYTHONPATH: /app/python/src  
-      DATABASE_URL: ${DATABASE_URL}
-      DATABASE_APP_KEY: ${DATABASE_APP_KEY}
-      JSEARCH_APP_HOST: ${JSEARCH_APP_HOST}
-      JSEARCH_APP_KEY: ${JSEARCH_APP_KEY}
-      CAREERJET_APP_KEY: ${CAREERJET_APP_KEY}
-      CAREERJET_USER_AGENT: ${CAREERJET_USER_AGENT}
-      CAREERJET_REFERER: ${CAREERJET_REFERER}
-      SERVER_IP: ${SERVER_IP}
-      DB_HOST: ${DB_HOST}
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_SSLMODE: ${DB_SSLMODE}
-      DB_CHANNELBIDING: ${DB_CHANNELBIDING}
-    volumes:
-      - ./ingestion/python:/ingestion/python
-    working_dir: /ingestion
-    command: ["python", "python/src/database.py"]
-    # command: ["python", "python/test_api.py", "--mock"]
-
-
-  # ──────────────────────────────────────────
-  # Environnement Airflow
-  # ──────────────────────────────────────────
-
   airflow-postgres:
     image: postgres:16-alpine
     container_name: latam_airflow_postgres
@@ -70,6 +31,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     entrypoint: /bin/bash
     command: -c "
+      pip install requests python-dotenv psycopg2-binary &&
       airflow db migrate &&
       airflow users create \
         --username ${AIRFLOW_ADMIN_USERNAME} \
@@ -86,14 +48,33 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+    env_file:
+      - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      DATABASE_URL: ${DATABASE_URL}
+      PYTHONPATH: /opt/airflow/pipeline   # ← pointe vers python/src/
+      AIRFLOW_VAR_RAW_DATA_PATH: ${RAW_DATA_PATH}
+      # Variables Airflow auto-créées
+      AIRFLOW_VAR_DB_HOST: ${DB_HOST}
+      AIRFLOW_VAR_DB_NAME: ${DB_NAME}
+      AIRFLOW_VAR_DB_USER: ${DB_USER}
+      AIRFLOW_VAR_DB_PASSWORD: ${DB_PASSWORD}
+      AIRFLOW_VAR_DB_SSLMODE: ${DB_SSLMODE}
+      AIRFLOW_VAR_DB_CHANNELBINDING: ${DB_CHANNELBINDING}
+      AIRFLOW_VAR_JSEARCH_APP_KEY: ${JSEARCH_APP_KEY}
+      AIRFLOW_VAR_JSEARCH_APP_HOST: ${JSEARCH_APP_HOST}
+      AIRFLOW_VAR_CAREERJET_APP_KEY: ${CAREERJET_APP_KEY}
+      AIRFLOW_VAR_CAREERJET_USER_AGENT: ${CAREERJET_USER_AGENT}
+      AIRFLOW_VAR_CAREERJET_REFERER: ${CAREERJET_REFERER}
+      AIRFLOW_VAR_SERVER_IP: ${SERVER_IP}
     volumes:
-      - ./ingestion/airflow/dags:/opt/airflow/dags
+      - ./ingestion/airflow/dags:/opt/airflow/dags       # ← DAGs
+      - ./ingestion/python/src:/opt/airflow/pipeline     # ← scripts Python
       - ./ingestion/logs:/opt/airflow/logs
+      - ./ingestion/raw:/opt/airflow/raw
+      - ./ingestion/config:/opt/airflow/config   # config api requests
     command: scheduler
 
   airflow-webserver:
@@ -103,15 +84,16 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+    env_file:
+      - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
-      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
-      AIRFLOW_ADMIN_EMAIL: ${AIRFLOW_ADMIN_EMAIL}
+      PYTHONPATH: /opt/airflow/pipeline   # ← pointe vers python/src/
     volumes:
-      - ./ingestion/airflow/dags:/opt/airflow/dags
+      - ./ingestion/airflow/dags:/opt/airflow/dags       # ← DAGs
+      - ./ingestion/python/src:/opt/airflow/pipeline     # ← scripts Python
       - ./ingestion/logs:/opt/airflow/logs
     ports:
       - "8080:8080"

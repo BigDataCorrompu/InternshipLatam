@@ -184,11 +184,17 @@ class CareerJetAPI(JobAPI):
     }
 
 
-    def __init__(self, api_key: str=None, daysMaxOffer: int=3):
+    def __init__(
+        self, 
+        api_key: str = None,
+        user_ip: str = None,        # ← paramètre de constructeur
+        user_agent: str = None,     # ← paramètre de constructeur
+        days_max_offer: int = 3,
+    ):
         super().__init__(api_key or os.getenv('CAREERJET_APP_KEY'))
         credentials = base64.b64encode(f"{self.api_key}:".encode()).decode()
-        self.user_ip    = os.getenv('SERVER_IP')
-        self.user_agent = os.getenv('CAREERJET_USER_AGENT', 'InternshipLatam/1.0')
+        self.user_ip    = user_ip or os.getenv('SERVER_IP')
+        self.user_agent = user_agent or os.getenv('CAREERJET_USER_AGENT', 'InternshipLatam/1.0')
         # L'API v4 exige un Referer correspondant au site déclaré dans le compte publisher
         self.referer    = os.getenv('CAREERJET_REFERER')
         self.headers = {
@@ -198,7 +204,7 @@ class CareerJetAPI(JobAPI):
             self.headers["Referer"] = self.referer
 
 
-        self.daysMaxOffer = daysMaxOffer
+        self.days_max_offer = days_max_offer
         
 
     # ___________ PAGINATION ___________
@@ -212,14 +218,12 @@ class CareerJetAPI(JobAPI):
         if not jobs:  # Prevent index error
             return False
         last_date = parsedate_to_datetime(jobs[-1]['date'])   
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self.daysMaxOffer)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.days_max_offer)
         return last_date >= cutoff         # return if we are still in the desired plage
 
     def _next_page(self, raw: dict, page) -> int:
         return page + 1
-    
-    def setDaysMaxOffer(self, days: int=3):
-        self.daysMaxOffer = days
+
 
 
     # ___________ ENDPOINT ___________

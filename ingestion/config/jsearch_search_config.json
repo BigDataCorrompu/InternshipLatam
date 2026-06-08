@@ -1,0 +1,7 @@
+
+{
+    "query": ["data engineer intern", "data pipeline junior"],
+    "location": ["Santiago Chile", "Buenos Aires Argentina", "Montevideo Uruguay"],
+    "num_pages": 1,
+    "date_posted": "month"
+}

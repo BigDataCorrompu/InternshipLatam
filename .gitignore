@@ -1,6 +1,6 @@
 # ── Secrets ──────────────────────────────────
 .env
- 
+
 # ── Python ───────────────────────────────────
 __pycache__/
 *.pyc
@@ -10,25 +10,23 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-**/__pycache__/
-*.pyc
- 
+
 # ── Logs ─────────────────────────────────────
 logs/
 *.log
 
+# ── Data ─────────────────────────────────────
 ingestion/python/results/
-*.json
- 
+ingestion/raw/          # ← raw data pas sur github
+
 # ── Docker ───────────────────────────────────
 docker-compose.override.yml
- 
+
 # ── OS ───────────────────────────────────────
 .DS_Store
 Thumbs.db
- 
+
 # ── IDE ──────────────────────────────────────
 .vscode/
 .idea/
 *.swp
- ingestion/python/results/
