@@ -8,5 +8,4 @@ DROP TABLE IF EXISTS analytics.job_offer;
 CREATE TABLE analytics.job_offer (LIKE raw.job_offer INCLUDING ALL);
 
 -- _______ Add constraint _______
-ALTER TABLE IF EXISTS analytics.job_offer
-ADD CONSTRAINT pk_id_job PRIMARY KEY (id_job);
+ALTER TABLE IF EXISTS analytics.job_offer;

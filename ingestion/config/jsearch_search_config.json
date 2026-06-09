@@ -1,7 +1,17 @@
 
 {
-    "query": ["data engineer intern", "data pipeline junior"],
-    "location": ["Santiago Chile", "Buenos Aires Argentina", "Montevideo Uruguay"],
-    "num_pages": 1,
-    "date_posted": "month"
+    "default_params": {
+        "num_pages": 10,
+        "date_posted": "year"
+    },
+    "queries": [
+        {"query": "data engineer Santiago Chile",          "country": "cl", "language": "es"},
+        {"query": "data engineer Buenos Aires",            "country": "ar", "language": "es"},
+        {"query": "data engineer Montevideo",              "country": "uy", "language": "es"},
+        {"query": "data scientist Santiago Chile",         "country": "cl", "language": "es"},
+        {"query": "data analyst Buenos Aires",             "country": "ar", "language": "es"},
+        {"query": "ingeniero de datos Santiago",           "country": "cl", "language": "es"},
+        {"query": "data engineer remote",                  "country": "us", "language": "en"},
+        {"query": "data engineering internship remote",    "country": "us", "language": "en"}
+    ]
 }

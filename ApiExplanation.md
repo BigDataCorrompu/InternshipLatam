@@ -237,7 +237,7 @@ L'API v4 vérifie **trois** choses indépendantes. Tant que les trois ne sont pa
 |---|---|---|---|---|
 | `keywords` | String | ❌ | — | Mots clés de recherche (URL-encoded) |
 | `location` | String | ❌ | — | Localisation — si vide : recherche nationale |
-| `locale_code` | String | ❌ | `en_GB` | Code locale `[langue]_[PAYS]` (ex. `es_CL`, `es_AR`, `es_UY`) |
+| `locale_code` | String | ❌ | `en_GB` | Code locale `[langue]_[PAYS]` (ex. `es_CL`, `es_AR`, `es_UY`). Note: les locales `en_XX` pour l'Amérique latine ne sont pas supportées (ex. `en_AR`, `en_CL`, `en_UY` → HTTP 400) |
 | `contract_type` | Enum | ❌ | — | `p` permanent, `c` contract, `t` temporaire, `i` stage, `v` bénévolat |
 | `work_hours` | Enum | ❌ | — | `f` temps plein, `p` temps partiel |
 | `sort` | Enum | ❌ | `relevance` | `relevance`, `date`, `salary` |

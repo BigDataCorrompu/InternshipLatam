@@ -9,7 +9,7 @@ DROP TABLE IF EXISTS raw.job_offer;
 
 CREATE TABLE raw.job_offer (
     -- Identifiants
-    id_job          VARCHAR(50),        -- JSearch ~32 chars, CJ hash
+    id_job          VARCHAR(50)         PRIMARY KEY,        -- JSearch ~32 chars, CJ hash
     api_source          VARCHAR(15)     NOT NULL,           -- "jsearch" | "careerjet"
 
     -- Offre

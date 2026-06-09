@@ -187,8 +187,8 @@ class CareerJetAPI(JobAPI):
     def __init__(
         self, 
         api_key: str = None,
-        user_ip: str = None,        # ← paramètre de constructeur
-        user_agent: str = None,     # ← paramètre de constructeur
+        user_ip: str = None,        # Mandatory careerjet call API
+        user_agent: str = None,     # Mandatory careerjet call API
         days_max_offer: int = 3,
     ):
         super().__init__(api_key or os.getenv('CAREERJET_APP_KEY'))

@@ -1,0 +1,25 @@
+{
+    "default_params": {
+        "sort":          "date",
+        "page_size":     50,
+        "fragment_size": 300,
+        "work_hours":    "f"
+    },
+    "queries": [
+        {
+            "keywords":    "data engineer",
+            "location":    "Santiago",
+            "locale_code": "es_CL"
+        },
+        {
+            "keywords":    "data engineer",
+            "location":    "Buenos Aires",
+            "locale_code": "es_AR"
+        },
+        {
+            "keywords":    "data engineer",
+            "location":    "Montevideo",
+            "locale_code": "es_UY"
+        }
+    ]
+}
