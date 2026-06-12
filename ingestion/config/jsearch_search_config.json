@@ -1,17 +1,14 @@
-
 {
     "default_params": {
-        "num_pages": 10,
-        "date_posted": "year"
+        "num_pages": 3,
+        "date_posted": "month" 
     },
     "queries": [
-        {"query": "data engineer Santiago Chile",          "country": "cl", "language": "es"},
-        {"query": "data engineer Buenos Aires",            "country": "ar", "language": "es"},
-        {"query": "data engineer Montevideo",              "country": "uy", "language": "es"},
-        {"query": "data scientist Santiago Chile",         "country": "cl", "language": "es"},
-        {"query": "data analyst Buenos Aires",             "country": "ar", "language": "es"},
-        {"query": "ingeniero de datos Santiago",           "country": "cl", "language": "es"},
-        {"query": "data engineer remote",                  "country": "us", "language": "en"},
-        {"query": "data engineering internship remote",    "country": "us", "language": "en"}
+        {"query": "data engineer", "country": "cl"},
+        {"query": "data engineer", "country": "ar"},
+        {"query": "data engineer", "country": "uy"},
+        {"query": "ingeniero de datos", "country": "cl"},
+        {"query": "data scientist", "country": "ar"},
+        {"query": "data analyst", "country": "cl"}
     ]
 }

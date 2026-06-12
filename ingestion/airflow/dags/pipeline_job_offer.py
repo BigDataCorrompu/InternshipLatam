@@ -49,12 +49,21 @@ def fetch_job_jsearch(ds=None) -> None:
         q_copy = q.copy()
         query = q_copy.pop('query') # get mandatory jsearch parameter
         config = params | q_copy
-        jobs = jsearch.search_jobs(query=query, paginate=True, **config)
+        try:
+            jobs = jsearch.search_jobs(query=query, paginate=True, **config)
+        except Exception as e:
+            logger.warning(f"[EXTRACT] source=jsearch query='{query}' status=error err={e}")
+            jobs = []
         all_responses.append({
             "params": {'query': query} | config,
             "data" : jobs
         })
         logger.info(f"[EXTRACT] source=jsearch query='{query}' records={len(jobs)}")
+
+        # Gestion quota api    
+        if jsearch.quota_exceeded:
+            logger.warning(f"[Extract] source=jsearch exhausted — stopped after query='{query}'")
+            break
 
     # Load raw in local file
     directory = RAW_PATH / ds / RAW_FILE_JSEARCH
@@ -63,6 +72,11 @@ def fetch_job_jsearch(ds=None) -> None:
 
     total = sum(len(r['data']) for r in all_responses)
     logger.info(f"[EXTRACT] source=jsearch date={ds} total={total} status=success")
+
+    # Gestion quota api
+    if jsearch.quota_exceeded and total == 0:               # quota ended and nothing collected -> skip
+        raise AirflowSkipException("Jsearch quota exhausted, no offer collected")
+        # CAN USE A SECOND API KEY HERE
 
 
 @task(task_id="fetch_job_careerjet")
@@ -90,13 +104,23 @@ def fetch_job_careerjet(ds=None) -> None:
         })
         keywords_debug = q.get('keywords', {})
         logger.info(f"[EXTRACT] source=careerjet keyword={keywords_debug} records={len(jobs)}")
+        
+        # Gestion quota api    
+        if careerjet.quota_exceeded:
+            logger.warning(f"[Extract] source=jsearch exhausted — stopped after keyword={keywords_debug}")
+            break
 
     # Load raw in local file
     directory = RAW_PATH / ds / RAW_FILE_CAREERJET
     directory.mkdir(parents=True, exist_ok=True) # Create file if doesn't exist
     write_json(str(directory), 'careerjet_search', all_responses)
-    logger.info(f"[EXTRACT] source=careerjet  records={len(all_responses)}")
+    total = sum(len(r['data']) for r in all_responses)
+    logger.info(f"[EXTRACT] source=careerjet date={ds} total={total} status=success")
 
+    # Gestion quota api  
+    if careerjet.quota_exceeded and total == 0:               # quota ended and nothing collected -> skip
+        raise AirflowSkipException("CareerJet quota exhausted, no offer collected")
+        # CAN USE A SECOND API KEY HERE
 
 
 
@@ -113,21 +137,22 @@ def _load_source(api: str, ds=None) -> None:
 
     for json_file in Path(directory).glob("*.json"):
         filename = json_file.stem
-        blocks = load_json(str(directory), filename)
 
-        if not blocks:
-            raise AirflowSkipException(f"No data {api}")
-        
+        blocks = load_json(str(directory), filename) or [] # Modif against skip if no data for a request
         
         for block in blocks:
-            params = block.get("params", {})
-            data = block.get("data", [])
+            params = block.get("params") or {}
+            data = block.get("data") or []
+            logger.info(f"[DEBUG] block params={params} jobs={len(data)}")
             for d in data:
-                rows = mapper.normalise(
-                    data=d, 
-                    metaData=params
-                )
-                all_data.append(rows)
+                try:
+                    rows = mapper.normalise(
+                        data=d, 
+                        metaData=params
+                    )
+                    all_data.append(rows)
+                except Exception as e:
+                    logger.warning(f"[LOAD] skip record api={api} err={e}")
         file_records = len(all_data)
         logger.info(f"[LOAD] file={json_file.name} records={file_records}")
     
@@ -148,9 +173,7 @@ def _load_source(api: str, ds=None) -> None:
     db.bulk_insert(
         JOB_OFFER_TABLE, 
         data_to_insert["columns"],
-        data_to_insert["data"],
-        onConflict='update',
-        conflict_columns = CONFLICT_COLUMNS,
+        data_to_insert["data"]
     )
 
 @task(task_id="load_job_jsearch")

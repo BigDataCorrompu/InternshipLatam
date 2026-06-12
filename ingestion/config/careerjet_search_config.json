@@ -5,11 +5,13 @@
         "fragment_size": 300
     },
     "queries": [
-        {"keywords": "data engineer",   "location": "Santiago",     "locale_code": "es_CL"},
-        {"keywords": "data engineer",   "location": "Buenos Aires", "locale_code": "es_AR"},
-        {"keywords": "data engineer",   "location": "Montevideo",   "locale_code": "es_UY"},
-        {"keywords": "data scientist",  "location": "Santiago",     "locale_code": "es_CL"},
-        {"keywords": "data analyst",    "location": "Buenos Aires", "locale_code": "es_AR"},
-        {"keywords": "ingeniero datos", "location": "Santiago",     "locale_code": "es_CL"}
+        {"keywords": "data engineer",      "location": "Santiago",     "locale_code": "es_CL"},
+        {"keywords": "data engineer",      "location": "Buenos Aires", "locale_code": "es_AR"},
+        {"keywords": "data engineer",      "location": "Montevideo",   "locale_code": "es_UY"},
+        {"keywords": "ingeniero de datos", "location": "Santiago",     "locale_code": "es_CL"},
+        {"keywords": "data scientist",     "location": "Buenos Aires", "locale_code": "es_AR"},
+        {"keywords": "data analyst",       "location": "Santiago",     "locale_code": "es_CL"},
+        {"keywords": "ETL developer",      "location": "Buenos Aires", "locale_code": "es_AR"},
+        {"keywords": "pipeline data",      "location": "Montevideo",   "locale_code": "es_UY"}
     ]
 }

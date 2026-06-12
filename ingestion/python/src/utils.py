@@ -15,7 +15,7 @@ def write_json(filepath: str, filename: str, data: dict) -> None:
     """
     path = (Path(filepath) / filename).with_suffix('.json')
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
     logger.info(f"[WRITE] file={filename} status=success")
 
 def load_json(filepath: str, filename: str) -> dict:

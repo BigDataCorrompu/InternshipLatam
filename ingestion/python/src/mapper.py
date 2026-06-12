@@ -51,7 +51,9 @@ class JobOffer:
     # Dates
     published_at:     str | None = None   # FOUILLER "job_posted_at" si date est null
     collected_at:     str | None = None   # DEFAULT NOW() géré en SQL
-    
+
+    # Query
+    search_query:     str | None = None
 
 
 class Mapper(ABC):
@@ -144,7 +146,8 @@ class CareerjetMapper(JobMapper):
             salary_max        = None,
             salary_period     = None,
             collected_at      = datetime.utcnow().isoformat(),
-            published_at      = self._parse_date(data.get("date"))
+            published_at      = self._parse_date(data.get("date")),
+            search_query      = metaData.get('keywords')
         )
     
     def _parse_date(self, date_str: str) -> str | None:
@@ -204,13 +207,11 @@ class JsearchMapper(JobMapper):
                                     data.get("job_posted_at_datetime_utc"),
             
             ),
+            search_query      = metaData.get('query')
         )
 
 
     def _parse_posted_at(self, job_posted_at: str, job_posted_at_utc: str) -> str | None:
-        """Retourne la date UTC si dispo, sinon calcule depuis 'hace X días'."""
-        
-        # ✅ Date UTC disponible — priorité
         if job_posted_at_utc:
             return job_posted_at_utc
 
@@ -219,23 +220,39 @@ class JsearchMapper(JobMapper):
 
         now = datetime.utcnow()
 
-        # "hace 5 días" / "hace 1 día"
+        # "hace 5 días" / "hace 1 día" — espagnol
         match = re.search(r'hace\s+(\d+)\s+d[ií]a', job_posted_at, re.IGNORECASE)
         if match:
-            days = int(match.group(1))
-            return (now - timedelta(days=days)).isoformat()
+            return (now - timedelta(days=int(match.group(1)))).isoformat()
 
-        # "hace 2 semanas"
+        # "hace 2 semanas" — espagnol
         match = re.search(r'hace\s+(\d+)\s+semana', job_posted_at, re.IGNORECASE)
         if match:
-            weeks = int(match.group(1))
-            return (now - timedelta(weeks=weeks)).isoformat()
+            return (now - timedelta(weeks=int(match.group(1)))).isoformat()
 
-        # "hace 1 mes"
+        # "hace 1 mes" — espagnol
         match = re.search(r'hace\s+(\d+)\s+mes', job_posted_at, re.IGNORECASE)
         if match:
-            months = int(match.group(1))
-            return (now - timedelta(days=months * 30)).isoformat()
+            return (now - timedelta(days=int(match.group(1)) * 30)).isoformat()
+
+        # "3 days ago" — anglais ✅
+        match = re.search(r'(\d+)\s+day', job_posted_at, re.IGNORECASE)
+        if match:
+            return (now - timedelta(days=int(match.group(1)))).isoformat()
+
+        # "2 weeks ago" — anglais ✅
+        match = re.search(r'(\d+)\s+week', job_posted_at, re.IGNORECASE)
+        if match:
+            return (now - timedelta(weeks=int(match.group(1)))).isoformat()
+
+        # "1 month ago" — anglais ✅
+        match = re.search(r'(\d+)\s+month', job_posted_at, re.IGNORECASE)
+        if match:
+            return (now - timedelta(days=int(match.group(1)) * 30)).isoformat()
+
+        # "just posted" / "today" — anglais ✅
+        if re.search(r'today|just|aujourd', job_posted_at, re.IGNORECASE):
+            return now.isoformat()
 
         return None
     

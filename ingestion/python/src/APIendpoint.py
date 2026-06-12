@@ -6,6 +6,14 @@ from typing import Callable
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
+# Gestion quota api
+import logging
+logger = logging.getLogger(__name__)
+
+# Gestion quota api
+class QuotaExceededError(Exception):
+    """Levée quand l'API signale un quota/crédit épuisé (HTTP 429)."""
+    pass
 
 # ──────────────────────────────────────────
 # Parent API
@@ -18,20 +26,24 @@ class API(ABC):
 
     def __init__(self, api_key):
         self.api_key = api_key
+        self.quota_exceeded = False
 
     def _generate_params(self, params: dict, **kwargs):
         for key, val in kwargs.items():
             params[key] = ','.join(str(v) for v in val) if isinstance(val, list) else val
         return params
     
-    def normalize(self, raw: dict) -> dict:
-        pass
         
     def _call(self, endpoint: str, params: dict):
         url = self.BASE_URL + self.ENDPOINTS[endpoint]
         response = requests.get(url, headers=self.headers, params=params)
         if response.status_code != 200:
             raise Exception(f"HTTP {response.status_code} : {response.text}")
+        
+        # Gestion quota api
+        if response.status_code == 429:                      
+            raise QuotaExceededError(response.text[:200])
+        
         return response.json()
 
 
@@ -43,19 +55,23 @@ class API(ABC):
         La première page est demandée SANS paramètre de pagination.
         max_pages (optionnel) plafonne le nombre de pages pour ménager le quota.
         """
-        all_results = []
-        page_num = 1
-        raw = endpoint_func(**kwargs)                 # page 1 : pas de jeton
-        all_results.extend(self._extract_results(raw))
-
-        pages_done = 1
-        while self._has_next_page(raw, page_num) and (max_pages is None or pages_done < max_pages):
-            token = self._next_page(raw, page_num)
-            raw = endpoint_func(**{self.PAGE_PARAM: token}, **kwargs)
-            page_num = token if isinstance(token, int) else page_num + 1
+        try:
+            all_results = []
+            page_num = 1
+            raw = endpoint_func(**kwargs)                 # page 1 : pas de jeton
             all_results.extend(self._extract_results(raw))
-            pages_done += 1
 
+            pages_done = 1
+            while self._has_next_page(raw, page_num) and (max_pages is None or pages_done < max_pages):
+                token = self._next_page(raw, page_num)
+                raw = endpoint_func(**{self.PAGE_PARAM: token}, **kwargs)
+                page_num = token if isinstance(token, int) else page_num + 1
+                all_results.extend(self._extract_results(raw))
+                pages_done += 1
+        # Gestion quota api
+        except QuotaExceededError:
+            self.quota_exceeded = True
+            logger.warning(f"Quota exhausted — pagination stopped, {len(all_results)} results retained")
         return all_results
     
     @abstractmethod
