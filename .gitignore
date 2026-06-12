@@ -17,7 +17,8 @@ logs/
 
 # ── Data ─────────────────────────────────────
 ingestion/python/results/
-ingestion/raw/          # ← raw data pas sur github
+ingestion/raw/          
+
 
 # ── Docker ───────────────────────────────────
 docker-compose.override.yml

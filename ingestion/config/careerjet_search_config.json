@@ -1,6 +1,15 @@
 {
-    "query": ["data engineer intern", "data pipeline junior"],
-    "location": ["Santiago Chile", "Buenos Aires Argentina", "Montevideo Uruguay"],
-    "num_pages": 1,
-    "date_posted": "month"
+    "default_params": {
+        "sort":          "date",
+        "page_size":     100,
+        "fragment_size": 300
+    },
+    "queries": [
+        {"keywords": "data engineer",   "location": "Santiago",     "locale_code": "es_CL"},
+        {"keywords": "data engineer",   "location": "Buenos Aires", "locale_code": "es_AR"},
+        {"keywords": "data engineer",   "location": "Montevideo",   "locale_code": "es_UY"},
+        {"keywords": "data scientist",  "location": "Santiago",     "locale_code": "es_CL"},
+        {"keywords": "data analyst",    "location": "Buenos Aires", "locale_code": "es_AR"},
+        {"keywords": "ingeniero datos", "location": "Santiago",     "locale_code": "es_CL"}
+    ]
 }

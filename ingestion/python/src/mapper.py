@@ -69,6 +69,13 @@ class JobMapper(Mapper):
     def getColumns(dataclass: Type[JobOffer]=JobOffer) -> list:
         """ Return a list of columns structured in JobOffer"""
         return [f.name for f in fields(dataclass)]
+    
+    
+    def structureToBulkInsert(self, rows: list) -> dict:
+        return {
+            "columns"   : self.getColumns(),
+            "data"      : [astuple(job) for job in rows]
+        }
 
     def getJobs(self, raw:dict) -> list:
         """ Return a list of tuples representing each lines in databases"""
