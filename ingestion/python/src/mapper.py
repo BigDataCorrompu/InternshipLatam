@@ -39,8 +39,6 @@ class JobOffer:
     # Description
     offer_description: str | None = None
     job_highlights:    str | None = None        # JSON sérialisé
-    experience_level:  str | None = None        # ajout
-    search_language:   str | None = None        # ajout
 
     # Salaire
     salary_raw:       str | None = None
@@ -50,10 +48,10 @@ class JobOffer:
 
     # Dates
     published_at:     str | None = None   # FOUILLER "job_posted_at" si date est null
-    collected_at:     str | None = None   # DEFAULT NOW() géré en SQL
+    collected_at:     str = field(default_factory=lambda: datetime.utcnow().isoformat())   # DEFAULT NOW() géré en SQL
 
     # Query
-    search_query:     str | None = None
+    query_parameters:     str | None = None
 
 
 class Mapper(ABC):
@@ -139,15 +137,13 @@ class CareerjetMapper(JobMapper):
             source_platform   = data.get("site") or None,  # souvent vide → None
             offer_description = data.get("description"),
             job_highlights    = None,
-            experience_level  = None,
-            search_language   = search_language,
             salary_raw        = data.get("salary") or None,  # souvent vide → None
             salary_min        = None,                    # pas structuré Careerjet
             salary_max        = None,
             salary_period     = None,
             collected_at      = datetime.utcnow().isoformat(),
             published_at      = self._parse_date(data.get("date")),
-            search_query      = metaData.get('keywords')
+            query_parameters  = json.dumps(metaData)
         )
     
     def _parse_date(self, date_str: str) -> str | None:
@@ -195,8 +191,7 @@ class JsearchMapper(JobMapper):
             source_platform   = data.get("job_publisher"),
             offer_description = self._extract_description(data.get("job_description")),
             job_highlights    = json.dumps(highlights) if highlights else None,
-            experience_level  = metaData.get("country"),
-            search_language   = metaData.get("language"),
+
             salary_raw        = data.get("job_salary_string"),
             salary_min        = data.get("job_min_salary"),
             salary_max        = data.get("job_max_salary"),
@@ -205,9 +200,8 @@ class JsearchMapper(JobMapper):
             published_at      = self._parse_posted_at(          
                                     data.get("job_posted_at"),
                                     data.get("job_posted_at_datetime_utc"),
-            
-            ),
-            search_query      = metaData.get('query')
+                                ),
+            query_parameters  = json.dumps(metaData)
         )
 
 
@@ -220,38 +214,11 @@ class JsearchMapper(JobMapper):
 
         now = datetime.utcnow()
 
-        # "hace 5 días" / "hace 1 día" — espagnol
-        match = re.search(r'hace\s+(\d+)\s+d[ií]a', job_posted_at, re.IGNORECASE)
+        match = re.search(r'(\d+)', job_posted_at)
         if match:
             return (now - timedelta(days=int(match.group(1)))).isoformat()
 
-        # "hace 2 semanas" — espagnol
-        match = re.search(r'hace\s+(\d+)\s+semana', job_posted_at, re.IGNORECASE)
-        if match:
-            return (now - timedelta(weeks=int(match.group(1)))).isoformat()
-
-        # "hace 1 mes" — espagnol
-        match = re.search(r'hace\s+(\d+)\s+mes', job_posted_at, re.IGNORECASE)
-        if match:
-            return (now - timedelta(days=int(match.group(1)) * 30)).isoformat()
-
-        # "3 days ago" — anglais ✅
-        match = re.search(r'(\d+)\s+day', job_posted_at, re.IGNORECASE)
-        if match:
-            return (now - timedelta(days=int(match.group(1)))).isoformat()
-
-        # "2 weeks ago" — anglais ✅
-        match = re.search(r'(\d+)\s+week', job_posted_at, re.IGNORECASE)
-        if match:
-            return (now - timedelta(weeks=int(match.group(1)))).isoformat()
-
-        # "1 month ago" — anglais ✅
-        match = re.search(r'(\d+)\s+month', job_posted_at, re.IGNORECASE)
-        if match:
-            return (now - timedelta(days=int(match.group(1)) * 30)).isoformat()
-
-        # "just posted" / "today" — anglais ✅
-        if re.search(r'today|just|aujourd', job_posted_at, re.IGNORECASE):
+        if re.search(r'today|just|aujourd|hoy', job_posted_at, re.IGNORECASE):
             return now.isoformat()
 
         return None
@@ -294,4 +261,4 @@ if __name__ == '__main__':
 
     columns = j.getColumns()
     jobsC = c.getJobs(careerjetdata)
-    jobsJ = c.getJobs(jsearchdata)
+    jobsJ = j.getJobs(jsearchdata)

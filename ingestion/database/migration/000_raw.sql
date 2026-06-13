@@ -5,13 +5,6 @@ CREATE SCHEMA IF NOT EXISTS raw;
 DROP TABLE IF EXISTS raw.job_offer;
 
 -- _______ Create structural tables _______
--- _______ Create Schema _______
-CREATE SCHEMA IF NOT EXISTS raw;
-
--- _______ Clean up existing tables to ensure a fresh state _______ 
-DROP TABLE IF EXISTS raw.job_offer;
-
--- _______ Create structural tables _______
 
 
 CREATE TABLE raw.job_offer (
@@ -37,25 +30,26 @@ CREATE TABLE raw.job_offer (
     is_remote       BOOLEAN,
 
     -- Candidature
-    offer_url       VARCHAR(500),                       -- CJ url = 263 chars fixes
+    offer_url       VARCHAR(300),                       -- CJ url = 263 chars fixes
     is_direct       BOOLEAN,
     source_platform VARCHAR(100),                       -- null CJ (site vide)
 
     -- Description
     offer_description TEXT,                             -- CJ ~300 chars, JS beaucoup plus long
     job_highlights   TEXT,
+    experience_level VARCHAR(15),
+    search_language VARCHAR(5),                         -- 'es' | 'en' | 'fr'
 
     -- Salaire
     salary_raw      VARCHAR(200),                       -- CJ toujours vide
     salary_min      FLOAT,                              -- null CJ
     salary_max      FLOAT,                              -- null CJ
-    salary_period   VARCHAR(50),                        -- null CJ
+    salary_period   VARCHAR(20),                        -- null CJ
 
     -- Dates
     published_at    TIMESTAMPTZ,                        -- CJ date string à parser
-    collected_at    TIMESTAMPTZ     DEFAULT NOW(),
+    collected_at    TIMESTAMPTZ     DEFAULT NOW()
 
     -- Query
-    query_parameters    JSONB
+    search_query    TEXT
 );
-
