@@ -95,12 +95,86 @@ class JobAPI(API):
     def search_jobs(self):
         pass
 
-
-
-class CompanyAPI(API):
+class GeoAPI(API):
     @abstractmethod
-    def search_company(self):
+    def search_place(self):
         pass
+
+    def _extract_results(self, response: dict) -> list:
+        return response.get("places", [])
+
+    def _has_next_page(self, response: dict) -> bool:
+        return False  # Places Text Search (New) n'a pas de pagination par défaut
+
+    def _next_page(self, response: dict) -> dict:
+        raise NotImplementedError("Pas de pagination pour cette API")
+
+
+# ──────────────────────────────────────────
+# Google Maps
+# ──────────────────────────────────────────
+class PlacesAPI(GeoAPI):
+    BASE_URL = 'https://places.googleapis.com'
+    ENDPOINTS = {
+        "search_text": 'v1/places:searchText'
+    }
+    def __init__(self, api_key: str = None):
+        super().__init__(api_key or os.getenv('MAPS_APP_KEY'))
+        self.headers={
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": self.api_key,
+            "X-Goog-FieldMask": (
+                "places.displayName,"
+                "places.formattedAddress,"
+                "places.location,"
+                "places.internationalPhoneNumber,"
+                "places.websiteUri,"
+                "places.rating,"
+                "places.userRatingCount,"
+                "places.businessStatus,"
+                "places.primaryType,"
+            )
+        }
+
+    def _call(self, endpoint: str, params: dict):
+        url = self.BASE_URL + "/" + self.ENDPOINTS[endpoint]
+        response = requests.post(url, headers=self.headers, json=params)  # POST + json
+        if response.status_code == 429:
+            raise QuotaExceededError(response.text[:200])
+
+        if response.status_code != 200:
+            raise Exception(f"HTTP {response.status_code} : {response.text}")
+        return response.json()
+
+    def search_place(self, company: str, location: str, **kwargs):
+        params = {"textQuery": f"{company}, {location}"}
+        params = self._generate_params(params, **kwargs)
+        result = self._call("search_text", params)
+        if not result:
+            return
+        return self._map_result(result.get("places")[0])
+    
+    def _map_result(self, result: dict) -> dict:
+        """Adapted to database structure tables"""
+        company_data = {
+            "name": result.get("displayName", {}).get("text"),
+            "primary_type": result.get("primaryType"),
+            "website": result.get("websiteUri"),
+        }
+        
+        location_data = {
+            "address": result.get("formattedAddress"),
+            "lat": result.get("location", {}).get("latitude"),
+            "lon": result.get("location", {}).get("longitude"),
+            "phone": result.get("internationalPhoneNumber"),
+            "business_status": result.get("businessStatus"),
+        }
+        
+        return {
+            "company": company_data,
+            "location": location_data
+        }
+        
 
 
 

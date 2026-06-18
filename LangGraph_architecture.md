@@ -13,6 +13,8 @@ graph LR
     1A_extract_location --> 2B_find_mail
     2A_extract_company --> 1B_find_location
     2A_extract_company --> 2B_find_mail
+    1A_extract_location --> 4B_find_website
+    2A_extract_company --> 4B_find_website
 
     1B_find_location --> END
     2B_find_mail --> END

@@ -30,6 +30,7 @@ erDiagram
   }
   job_relevancy {
     VARCHAR id_offer FK
+    FLOAR score_relevancy
     FLOAT score_skills
     FLOAT score_location
     FLOAT score_language
@@ -43,33 +44,33 @@ erDiagram
   }
   company {
     INT id_company PK
-    VARCHAR name_normalized
+    VARCHAR name
     VARCHAR website
+    VARCHAR primary_type
     TIMESTAMPTZ collected_at
   }
   company_location {
     INT id_location PK
     INT id_company FK
+    VARCHAR address
     VARCHAR city
     VARCHAR country
     FLOAT lat
     FLOAT lon
+    VARCHAR phone
+    VARCHAR business_status
     VARCHAR source
     TIMESTAMPTZ collected_at
   }
   company_contact {
     INT id_contact PK
     INT id_company FK
-    VARCHAR city
-    VARCHAR country
+    INT id_location FK
     VARCHAR email
+    FLOAT confidence
+    TEXT explanation
     VARCHAR source
     TIMESTAMPTZ collected_at
-  }
-  offer_contact {
-    VARCHAR id_offer FK
-    INT id_contact FK
-    FLOAT confidence
   }
 
   job_offer }o--|| company : "entreprise"
@@ -78,6 +79,5 @@ erDiagram
   job_offer ||--o{ job_relevancy : "scoré par LLM"
   company ||--o{ company_location : "possède"
   company ||--o{ company_contact : "a"
-  offer_contact }o--|| job_offer : ""
-  offer_contact }o--|| company_contact : ""
+  company_location ||--o{ company_contact : "rattaché à"
 ```

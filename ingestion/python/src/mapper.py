@@ -121,18 +121,18 @@ class CareerjetMapper(JobMapper):
         return JobOffer(
             id_job            = "cj_" + hashlib.md5(data.get("url", "").encode()).hexdigest(),
             api_source        = self.source,
-            job_title         = data.get("title"),
+            job_title         = data.get("title") or None,
             contract_type     = None,                    # pas disponible Careerjet
             job_publisher     = None,                    # pas disponible Careerjet
-            company           = data.get("company"),
+            company           = data.get("company") or None,
             company_website   = None,                    # pas disponible Careerjet
-            location_raw      = data.get("locations"),
-            city              = data.get("locations"),   # locations = ville directement
+            location_raw      = data.get("locations") or None,
+            city              = data.get("locations") or None,   # locations = ville directement
             country           = country,                    # à inférer depuis locale_code
             latitude          = None,
             longitude         = None,
             is_remote         = None,
-            offer_url         = data.get("url"),
+            offer_url         = data.get("url") or None,
             is_direct         = None,
             source_platform   = data.get("site") or None,  # souvent vide → None
             offer_description = data.get("description"),
@@ -173,29 +173,29 @@ class JsearchMapper(JobMapper):
         highlights = data.get("job_highlights")
 
         return JobOffer(
-            id_job            = data.get("job_id"),
+            id_job            = data.get("job_id") or None,
             api_source        = self.source,
-            job_title         = data.get("job_title"),
+            job_title         = data.get("job_title") or None,
             contract_type     = types[0] if types else None,
-            job_publisher     = data.get("job_publisher"),
-            company           = data.get("employer_name"),
-            company_website   = data.get("employer_website"),
-            location_raw      = data.get("job_location"),
-            city              = data.get("job_city"),
-            country           = data.get("job_country"),
+            job_publisher     = data.get("job_publisher") or None,
+            company           = data.get("employer_name") or None,
+            company_website   = data.get("employer_website") or None,
+            location_raw      = data.get("job_location") or None,
+            city              = data.get("job_city") or None,
+            country           = data.get("job_country") or None,
             latitude          = data.get("job_latitude"),
             longitude         = data.get("job_longitude"),
-            is_remote         = data.get("job_is_remote"),
-            offer_url         = data.get("job_apply_link"),
-            is_direct         = data.get("job_apply_is_direct"),
-            source_platform   = data.get("job_publisher"),
+            is_remote         = data.get("job_is_remote") or None,
+            offer_url         = data.get("job_apply_link") or None,
+            is_direct         = data.get("job_apply_is_direct") or None,
+            source_platform   = data.get("job_publisher") or None,
             offer_description = self._extract_description(data.get("job_description")),
             job_highlights    = json.dumps(highlights) if highlights else None,
 
-            salary_raw        = data.get("job_salary_string"),
-            salary_min        = data.get("job_min_salary"),
-            salary_max        = data.get("job_max_salary"),
-            salary_period     = data.get("job_salary_period"),
+            salary_raw        = data.get("job_salary_string") or None,
+            salary_min        = data.get("job_min_salary") or None,
+            salary_max        = data.get("job_max_salary") or None,
+            salary_period     = data.get("job_salary_period") or None,
             collected_at      =  datetime.utcnow().isoformat(),
             published_at      = self._parse_posted_at(          
                                     data.get("job_posted_at"),
