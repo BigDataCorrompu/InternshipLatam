@@ -97,7 +97,7 @@ class JobAPI(API):
 
 class GeoAPI(API):
     @abstractmethod
-    def search_place(self):
+    def search_place(self) -> dict | None:
         pass
 
     def _extract_results(self, response: dict) -> list:
@@ -136,6 +136,14 @@ class PlacesAPI(GeoAPI):
             )
         }
 
+    def search_place(self, company: str, location: str, **kwargs):
+        params = {"textQuery": f"{company}, {location}"}
+        params = self._generate_params(params, **kwargs)
+        result = self._call("search_text", params)
+        if not result:
+            return
+        return self._map_result_PlacesAPI(result.get("places")[0])
+
     def _call(self, endpoint: str, params: dict):
         url = self.BASE_URL + "/" + self.ENDPOINTS[endpoint]
         response = requests.post(url, headers=self.headers, json=params)  # POST + json
@@ -146,35 +154,23 @@ class PlacesAPI(GeoAPI):
             raise Exception(f"HTTP {response.status_code} : {response.text}")
         return response.json()
 
-    def search_place(self, company: str, location: str, **kwargs):
-        params = {"textQuery": f"{company}, {location}"}
-        params = self._generate_params(params, **kwargs)
-        result = self._call("search_text", params)
-        if not result:
-            return
-        return self._map_result(result.get("places")[0])
-    
-    def _map_result(self, result: dict) -> dict:
-        """Adapted to database structure tables"""
-        company_data = {
-            "name": result.get("displayName", {}).get("text"),
-            "primary_type": result.get("primaryType"),
-            "website": result.get("websiteUri"),
-        }
-        
-        location_data = {
-            "address": result.get("formattedAddress"),
-            "lat": result.get("location", {}).get("latitude"),
-            "lon": result.get("location", {}).get("longitude"),
-            "phone": result.get("internationalPhoneNumber"),
-            "business_status": result.get("businessStatus"),
-        }
-        
+    def _map_result_PlacesAPI(self, result: dict) -> dict:
+        """Maps raw Google Places result to JobOfferState keys."""
         return {
-            "company": company_data,
-            "location": location_data
+            # company 
+            "company_name":         result.get("displayName", {}).get("text"),
+            "company_primary_type": result.get("primaryType"),
+            "company_website":      result.get("websiteUri"),
+
+            # company_location 
+            "address":              result.get("formattedAddress"),
+            "lat":                  result.get("location", {}).get("latitude"),
+            "lon":                  result.get("location", {}).get("longitude"),
+            "phone":                result.get("internationalPhoneNumber"),
+            "business_status":      result.get("businessStatus"),
+            "rating":               result.get("rating"),
+            "rating_count":         result.get("userRatingCount"),
         }
-        
 
 
 

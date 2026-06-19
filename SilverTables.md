@@ -25,7 +25,7 @@ erDiagram
     TEXT[] skills_frameworks
     TEXT[] skills_aptitudes
     TEXT[] skills_soft_skills
-    VARCHAR prompt_version
+    TEXT prompt_version
     TIMESTAMPTZ collected_at
   }
   job_relevancy {
@@ -39,8 +39,12 @@ erDiagram
     FLOAT score_remote
     FLOAT score_company
     TEXT explanation
-    VARCHAR prompt_version
+    INT id_prompt FK
     TIMESTAMPTZ collected_at
+  }
+  prompt_relevancy {
+    INT id_prompt PK
+    TEXT prompt 
   }
   company {
     INT id_company PK
@@ -77,6 +81,7 @@ erDiagram
   job_offer }o--|| company_location : "filiale"
   job_offer ||--o{ job_requirement : "enrichi par LLM"
   job_offer ||--o{ job_relevancy : "scoré par LLM"
+  job_relevancy ||--o{ prompt_relevancy : "possède"
   company ||--o{ company_location : "possède"
   company ||--o{ company_contact : "a"
   company_location ||--o{ company_contact : "rattaché à"
