@@ -1,5 +1,6 @@
 # ── Secrets ──────────────────────────────────
 .env
+.streamlit/secrets.toml
 
 # ── Python ───────────────────────────────────
 __pycache__/
@@ -25,9 +26,7 @@ ingestion/raw/
 # ── Docker ───────────────────────────────────
 docker-compose.override.yml
 
-# ── Streamlit ───────────────────────────────────
-docker-compose.override.yml
-.streamlit/secrets.toml
+
 
 # ── OS ───────────────────────────────────────
 .DS_Store
