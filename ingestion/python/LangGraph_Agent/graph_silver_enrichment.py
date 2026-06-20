@@ -133,7 +133,7 @@ Languages informatique : python intermédiaire, sql intermédiaire, java interm�
 Framework : Docker intermédiaire, airflow débutant, PostgreSQL intermédiaire, cloud neon débutant, aws base, LangGraph, débutant 
 Ce que je cherche : Un stage en Amérique latine nottament Argentine, Chilie et Urugay dans les capitales en priorité donc Santiago, Buenos Aires, Montevideo.
 Je veux developper mes connaissance en cloud data engineering nottament AWS et l'ajout d'intégration LLM dans le processus de production avec LangGraph. 
-Je parle français C2, anglais b1, espagnol débutant A2.
+Je parle français C2, anglais B2, espagnol débutant A2.
 Je veux faire un stage a temps plein sur le lieux de l'ebtreprise, le remote hybride ne me derange pas
 """
 determine_relevancy = DetermineRelevancy(llm=llm.llama4_smart, profile=profile)

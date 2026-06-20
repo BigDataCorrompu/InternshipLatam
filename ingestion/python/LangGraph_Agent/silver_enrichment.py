@@ -169,6 +169,8 @@ class Extract:
                             I did an ingestion pipeline gathering job offer via APIs, I did it to find an internship/job automatically.
                             I want you to be the more precise possible, this is important for me to have valuable and correct information.
                             Task : {self._task}
+                            You MUST respond ONLY using the structured format provided, never write a conversational explanation.
+                            If no data is found, return null or an empty list. Do not explain why, just do as the explained structure format
                             If no information is available, do not invent one and return null for this field
                         """)
         user = HumanMessage(content=context)
@@ -177,14 +179,11 @@ class Extract:
             response = self._llm_structured.invoke([system, user])
             data = response.model_dump()
             if len(data) == 1:
-                # Schema with unique field
                 return {self._output_key: next(iter(data.values()))}
-            # Schema with many fields
             return data
         except Exception as e:
-            print(f"Erreur extraction {self._output_key} pour id_job={state.get('id_job')}: {e}")
-            # If multiple field schema return None in each field
-            if hasattr(self._schema, 'model_fields') and len(self._schema.model_fields) > 1:
+            print(f"❌ [{self._output_key}] Erreur pour id_job={state.get('id_job')}: {e}")
+            if len(self._schema.model_fields) > 1:
                 return {field: None for field in self._schema.model_fields}
             return {self._output_key: None}
 
