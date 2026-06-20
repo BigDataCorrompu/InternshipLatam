@@ -60,7 +60,11 @@ Regarde st.Page et st.navigation (API moderne de multipage, dans develop/concept
 Pour le README interactif assisté par IA, c'est en gros un mini chatbot sur un document : regarde st.chat_message et st.chat_input dans develop/api-reference/chat.
 Vu que tu as très peu de temps, je veux caler une vraie priorité avant que tu commences demain plutôt que de tout faire en parallèle.
 """
-
+st.sidebar.markdown("---")
+st.sidebar.markdown("###")
+st.sidebar.write("Dashboard develloped by X")
+st.sidebar.write("[LinkedIn](https://linkedin.com/in/X)")
+st.sidebar.write("[Github project](Github link)")
 
 @st.cache_resource
 def get_database():
