@@ -5,11 +5,13 @@ from langchain_core.messages import AnyMessage, HumanMessage, ToolMessage
 import operator
 import json
 from rapidfuzz import fuzz, process
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
+import operator
+from typing import Annotated
 import os
 import sys
 sys.path.append("../ingestion/python/src")     
@@ -45,26 +47,26 @@ class JobOfferState(TypedDict):
     contract_type: str | None   
     is_remote: bool | None   
     job_publisher: str | None   
-    location_raw: str | None   
-    company_raw: str | None   
+    location_raw: str | None    
     offer_url: str | None   
     source_platform: str | None   
-    offer_language: str | None   
+    offer_language: Annotated[list[str], operator.add] | None  
     published_at: str | None   
     collected_at: str
 
     # ── analytics.job_requirement ──
-    seniority: str | None   
-    skills_languages: list[str] | None
-    skills_framework: list[str] | None
-    skills_aptitudes: list[str] | None
-    skills_soft: list[str] | None
+    seniority: str | None
+    alternative_job_titles: Annotated[list[str], operator.add] | None  
+    skills_languages: Annotated[list[str], operator.add] | None
+    skills_framework: Annotated[list[str], operator.add] | None
+    skills_aptitudes: Annotated[list[str], operator.add] | None
+    skills_soft: Annotated[list[str], operator.add] | None
 
     # ── analytics.job_relevancy ──
     score_relevancy: float | None   
     score_details: dict | None   
     explanation: str | None  
-    prompt_relevancy: str | None 
+    prompt_user_profile: str | None 
 
     # ── analytics.company ──
     company_name: str | None   
@@ -82,7 +84,66 @@ class JobOfferState(TypedDict):
 
 
     # ── analytics.company_contact ──
-    contacts: list[dict]
+    contacts: Annotated[list[dict], operator.add]
+
+def map_bronze_to_JobOfferState(row: dict) -> JobOfferState:
+    """
+    Mapping from database to graph state. (Better for maintenance and debug)
+    If a value is absente instantiate None or []
+    """
+    return {
+        # ── keys ──
+        "id_job": row["id_job"],
+        "id_company": None,
+        "id_location": None,
+
+        # ── analytics.job_offer ──
+        "api_source": row["api_source"],
+        "job_title": row["job_title"],
+        "offer_description": row["offer_description"],
+        "contract_type": row["contract_type"],
+        "is_remote": row["is_remote"],
+        "job_publisher": row["job_publisher"],
+        "location_raw": row["location_raw"],
+        "offer_url": row["offer_url"],
+        "source_platform": row["source_platform"],
+        "offer_language": None,
+        "published_at": row["published_at"],
+        "collected_at": row["collected_at"],
+
+        # ── analytics.job_requirement ──
+        "seniority": None,
+        "alternative_job_titles": [],
+        "skills_languages": [],
+        "skills_framework": [],
+        "skills_aptitudes": [],
+        "skills_soft": [],
+
+
+        # ── analytics.job_relevancy ──
+        "score_relevancy": None,
+        "score_details": None,
+        "explanation": None,
+        "prompt_user_profile": None,
+
+        # ── analytics.company ──
+        "company_name": row["company"],          # ⚠️ raw.company → state.company_name
+        "company_website": row["company_website"],
+        "company_primary_type": None,
+
+        # ── analytics.company_location ──
+        "address": None,
+        "city": row["city"],
+        "country": row["country"],
+        "lat": row["latitude"],                   # ⚠️ raw.latitude → state.lat
+        "lon": row["longitude"],                   # ⚠️ raw.longitude → state.lon
+        "phone": None,
+        "business_status": None,
+
+        # ── analytics.company_contact ──
+        "contacts": [],
+    }
+
     
 
 
@@ -153,7 +214,7 @@ def make_verify_included_node(primary_key: str, fields: list[str], fallback_valu
     return verify_included
     
 
-def make_binary_route_node(primary_key: str, condition: list[str], node_if_true : str, node_if_false: str):
+def make_binary_route_node(primary_key: str, condition: list[str], node_if_true : list[str], node_if_false: list[str]):
     """
     Route towards a node depending of a condition
 
@@ -202,6 +263,10 @@ class FindLocation:
         if not result:
             return {}
         
+        if state.get('lat') is not None:
+            result['lat'] = state.get('lat')
+            result['lon'] = state.get('lon')
+            
         # If no coordinate available
         if result.get('lat') is None or result.get('lon') is None:
             return result
@@ -230,9 +295,16 @@ class FindMails:
     def __init__(self, llm):
         self._generate_query = Extract(
             llm=llm.llama3_smart, 
-            task="Generate an optimised search query to find HR contact email on web." \
-            "Adapt the language of your request with the local language of the country" \
-            "for example spanish in Chile, Argentina or Urugay",
+            task=(
+                "Generate an optimized search query to find an HR, recruitment, or technical contact email "
+                "for this company. "
+                "If the company website is known, prioritize a query using 'site:domain.com' combined with "
+                "terms like 'contact', 'careers', 'jobs', 'rrhh', 'recursos humanos', or 'trabaja con nosotros' "
+                "(adapted to the local language). "
+                "If no website is known, build a query using the company name plus contact/careers/HR keywords "
+                "in the local language. "
+                "Adapt the language of your query to the country: Spanish for Chile, Argentina, Uruguay."
+            ),
             output_key="search_query",
             schema=SearchQueryOutput,
             fields=["company_name", "city", "country"]
@@ -294,54 +366,63 @@ class FindMails:
 # =========================== Relevancy Calcule ===========================
 
 class OfferRelevancy(BaseModel):
-    score_skills: float = Field(
-        ge=0, le=10,
+    score_job: float | str | None = Field(
+        description=(
+            "A score matching on scale from 0 to 10 about the job I search and I could do. "
+            "against my profile and the job I search (provided in the system message). "
+            "10 = strong overlap with the job I want, 5 = partial/adjacent overlap, 0 = completely unrelated. "
+            "If you don't have enough information to score, return null."
+        )
+    )
+    score_skills: float | str | None = Field(
         description=(
             "Skills matching score from 0 to 10, comparing the skills required in this offer "
             "against my profile (provided in the system message). "
-            "10 = strong overlap with my skillset, 5 = partial/adjacent overlap, 0 = completely unrelated."
+            "10 = strong overlap with my skillset, 5 = partial/adjacent overlap, 0 = completely unrelated. "
+            "If you don't have enough information to score, return null."
         )
     )
-    score_language: float = Field(
-        ge=0, le=10,
+    score_language: float | str | None = Field(
         description=(
-            "Language fit score from 0 to 10, based on the offer's language compared to the languages I speak "
-            "(provided in the system message). "
-            "10 = offer language matches my fluent languages, 0 = offer requires a language I don't speak."
+            "Language fit score from 0 to 10, comparing the offer's language requirements "
+            "against my languages (provided in the system message). "
+            "Use this STRICT RUBRIC for professional contexts: "
+            "10 = I am Native, C2, or C1 in the required language. "
+            "7-8 = I am B2 (working proficiency) and the offer doesn't require native fluency. "
+            "2-4 = I am A2 or B1. This is usually INSUFFICIENT for a professional environment unless the offer explicitly accepts beginners. "
+            "0 = I do not speak the required language at all. "
+            "If the language is not specified or you can't deduce it, return null."
         )
     )
-    score_seniority: float = Field(
-        ge=0, le=10,
+    score_seniority: float | str | None = Field(
         description=(
             "Seniority fit score from 0 to 10, comparing the seniority required by the offer against my "
-            "10 = perfect match, 0 = requires a seniority level I don't have."
+            "10 = perfect match, 0 = requires a seniority level I don't have. "
+            "If seniority is not specified or you can't deduce it, return null."
         )
     )
-    score_work_mode: float = Field(
-        ge=0, le=10,
+    score_work_mode: float | str | None = Field(
         description=(
             "Work arrangement fit score from 0 to 10, combining both the work mode (remote/hybrid/on-site) "
             "and the contract type (internship, full-time, part-time, freelance) against my preferences "
             "(provided in the system message). "
             "10 = both work mode and contract type match my preferences, "
             "5 = only one of the two matches, "
-            "0 = neither matches."
-            "If you can't conclude attribute 5."
+            "0 = neither matches. "
+            "If you don't have enough information to conclude, return null."
         )
     )
-    score_company: float = Field(
-        ge=0, le=10,
+    score_company: float | str | None = Field(
         description=(
             "Company relevance score from 0 to 10 for my career goals (provided in the system message). "
-            "If no specific information about the company is available, return a neutral score of 5.0 "
-            "rather than guessing."
+            "If no specific information about the company is available, return null rather than guessing."
         )
     )
-    score_location: float = Field(
-        ge=0, le=10,
+    score_location: float | str | None = Field(
         description=(
             "Location fit score from 0 to 10, comparing the offer's location against my target locations "
-            "(provided in the system message)."
+            "(provided in the system message). "
+            "If the location is not specified or you can't deduce it, return null."
         )
     )
     explanation: str = Field(
@@ -351,6 +432,21 @@ class OfferRelevancy(BaseModel):
             "Always write it in english"
         )
     )
+
+    @field_validator(
+        "score_job", "score_skills", "score_language", "score_seniority",
+        "score_work_mode", "score_company", "score_location",
+        mode="after"
+    )
+    @classmethod
+    def coerce_and_clamp(cls, v):
+        if v is None:
+            return None  # Laisse passer le None
+        try:
+            v_float = float(v)
+            return max(0.0, min(10.0, v_float))
+        except ValueError:
+            return None  # Sécurité supplémentaire si Groq renvoie du texte inexploitable
 
 class DetermineRelevancy:
     def __init__(self, llm, profile: str):
@@ -371,9 +467,10 @@ class DetermineRelevancy:
             f"city: {state.get('city')}",
             f"country: {state.get('country')}",
             f"company_name: {state.get('company_name')}",
+            f"alternative_job_titles: {state.get('alternative_job_titles')}",
             f"skills_languages: {state.get('skills_languages')}",
             f"skills_framework: {state.get('skills_framework')}",
-            f"skills_aptitude: {state.get('skills_aptitude')}",
+            f"skills_aptitudes: {state.get('skills_aptitudes')}",
             f"skills_soft: {state.get('skills_soft')}",
         ])
 
@@ -391,39 +488,63 @@ class DetermineRelevancy:
 
         try:
             response = self._llm_structured.invoke([system, user])
-            return {**response.model_dump(), "prompt_relevancy": self._profile}
+            data = response.model_dump()
+            
+            # On extrait l'explication pour la mettre à la racine du State
+            explanation = data.pop("explanation", None)
+            
+            # On met tout le reste (les scores) dans score_details
+            return {
+                "score_details": data,
+                "explanation": explanation,
+                "prompt_user_profile": self._profile
+            }
         except Exception as e:
             print(f"Error calculate_relevancy for id={state.get('id_job')}: {e}")
             return {
-                "score_skills": None,
-                "score_language": None,
-                "score_seniority": None,
-                "score_company": None,
-                "score_location": None,
-                "score_work_mode": None,
+                "score_details": None,
                 "explanation": None,
-                "prompt_relevancy": self._profile
+                "prompt_user_profile": self._profile
             }
-        
-
 
 def calculate_total_score(state: JobOfferState, weights: dict) -> dict:
-    """Calcule le score de pertinence final pondéré à partir des sous-scores du LLM."""
+    """Calculate score based on the result of the LLM."""
+    
+    # Get dict of differents score attributed by the LLM
+    details = state.get("score_details")
+    if not details:
+        return {"score_relevancy": None}
+
+    # link weight to the scores
     criteria_map = {
-        "skills":    state.get("score_skills"),
-        "language":  state.get("score_language"),
-        "seniority": state.get("score_seniority"),
-        "company":   state.get("score_company"),
-        "location":  state.get("score_location"),
-        "work_mode": state.get("score_work_mode"),
+        "job":       details.get("score_job"),
+        "skills":    details.get("score_skills"),
+        "language":  details.get("score_language"),
+        "seniority": details.get("score_seniority"),
+        "company":   details.get("score_company"),
+        "location":  details.get("score_location"),
+        "work_mode": details.get("score_work_mode"),
     }
 
-    valid = {k: v for k, v in criteria_map.items() if v is not None}
+    # Convert in float and remove None values
+    valid = {}
+    for k, v in criteria_map.items():
+        if v is not None:
+            try:
+                valid[k] = float(v)
+            except ValueError:
+                pass
+
     if not valid:
-        return {"relevancy_score": None}
+        return {"score_relevancy": None}
 
-    total_weight = sum(weights[k] for k in valid)
-    weighted_sum = sum(valid[k] * weights[k] for k in valid)
+    # Calculate score
+    total_weight = sum(weights[k] for k in valid if k in weights)
+    if total_weight == 0:
+        return {"score_relevancy": None}
 
-    score = round(weighted_sum / total_weight, 2) if total_weight > 0 else None
-    return {"relevancy_score": score}
+    weighted_sum = sum(valid[k] * weights[k] for k in valid if k in weights)
+    score = round(weighted_sum / total_weight, 2)
+    
+    # Return the dict to JobOfferState
+    return {"score_relevancy": score}
