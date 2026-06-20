@@ -1,6 +1,34 @@
-from your_module import Database  # ta classe existante
+import streamlit as st
+import pandas as pd
+import numpy as np
+import time
+import sys
+import os
+
+# 1. Récupère le chemin du dossier parent commun
+dossier_parent = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+# 2. Construit le chemin pour le premier dossier voisin
+voisin_1 = os.path.join(dossier_parent, 'src')
+
+# 3. Construit le chemin pour le deuxième dossier voisin
+voisin_2 = os.path.join(dossier_parent, 'LangGraph_Agent')
+
+# 4. Ajoute les deux dossiers au système de recherche de Python
+for dossier in [voisin_1, voisin_2]:
+    if dossier not in sys.path:
+        sys.path.append(dossier)
+
+# 5. Importe vos fichiers respectifs 
+import database
+import silver_enrichment
 
 
+
+import database
+
+
+st.title('Tutoriel')
 """
 st.cache_data : pas utile pour le projet charge les données dans pandas et manipule les
 

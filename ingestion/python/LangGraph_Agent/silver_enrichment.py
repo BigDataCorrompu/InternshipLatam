@@ -20,6 +20,17 @@ from APIendpoint import GeoAPI
 import reverse_geocoder
 from ddgs import DDGS
 
+
+
+WEIGHTS = {
+    "job":       0.20,  # Nouvelle clé pour avantager l'intitulé du poste
+    "skills":    0.25,  # Reste le critère principal mais partagé avec le job title
+    "language":  0.20,  # Ajusté légèrement pour faire de la place
+    "seniority": 0.15,
+    "location":  0.15,
+    "company":   0.03,  # Réduit car souvent moins discriminant (ou confidentiel)
+    "work_mode": 0.02,  # Réduit pour garder une somme totale égale à 1.0
+}
 # =========================== LLM Defintion ===========================
 # LLM 
 class LLM:

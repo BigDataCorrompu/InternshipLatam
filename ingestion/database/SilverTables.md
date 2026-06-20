@@ -1,3 +1,4 @@
+# Schema analytics
 
 ```Mermaid
 erDiagram
@@ -14,29 +15,30 @@ erDiagram
     VARCHAR location_raw
     VARCHAR offer_url
     VARCHAR source_platform
-    VARCHAR offer_language
     TIMESTAMPTZ published_at
     TIMESTAMPTZ collected_at
   }
   job_requirement {
     VARCHAR id_offer FK
+    TEXT[] alternative_job_titles
+    TEXT[] offer_languages
     VARCHAR seniority
     TEXT[] skills_languages
     TEXT[] skills_frameworks
     TEXT[] skills_aptitudes
-    TEXT[] skills_soft_skills
+    TEXT[] skills_soft
     TEXT prompt_version
     TIMESTAMPTZ collected_at
   }
   job_relevancy {
     VARCHAR id_offer FK
-    FLOAR score_relevancy
+    FLOAT score_relevancy
+    FLOAT score_job
     FLOAT score_skills
     FLOAT score_location
     FLOAT score_language
     FLOAT score_seniority
-    FLOAT score_contract
-    FLOAT score_remote
+    FLOAT score_work_mode
     FLOAT score_company
     TEXT explanation
     INT id_prompt FK
@@ -48,7 +50,7 @@ erDiagram
   }
   company {
     INT id_company PK
-    VARCHAR name
+    VARCHAR company_name
     VARCHAR website
     VARCHAR primary_type
     TIMESTAMPTZ collected_at
@@ -81,7 +83,7 @@ erDiagram
   job_offer }o--|| company_location : "filiale"
   job_offer ||--o{ job_requirement : "enrichi par LLM"
   job_offer ||--o{ job_relevancy : "scoré par LLM"
-  job_relevancy ||--o{ prompt_relevancy : "possède"
+  job_relevancy }o--|| prompt_relevancy : "possède"
   company ||--o{ company_location : "possède"
   company ||--o{ company_contact : "a"
   company_location ||--o{ company_contact : "rattaché à"

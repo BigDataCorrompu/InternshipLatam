@@ -4,12 +4,6 @@ CREATE SCHEMA IF NOT EXISTS raw;
 -- _______ Clean up existing tables to ensure a fresh state _______ 
 DROP TABLE IF EXISTS raw.job_offer;
 
--- _______ Create structural tables _______
--- _______ Create Schema _______
-CREATE SCHEMA IF NOT EXISTS raw;
-
--- _______ Clean up existing tables to ensure a fresh state _______ 
-DROP TABLE IF EXISTS raw.job_offer;
 
 -- _______ Create structural tables _______
 

@@ -138,15 +138,6 @@ Je veux faire un stage a temps plein sur le lieux de l'ebtreprise, le remote hyb
 """
 determine_relevancy = DetermineRelevancy(llm=llm.llama4_smart, profile=profile)
 
-WEIGHTS = {
-    "job":       0.20,  # Nouvelle clé pour avantager l'intitulé du poste
-    "skills":    0.25,  # Reste le critère principal mais partagé avec le job title
-    "language":  0.20,  # Ajusté légèrement pour faire de la place
-    "seniority": 0.15,
-    "location":  0.15,
-    "company":   0.03,  # Réduit car souvent moins discriminant (ou confidentiel)
-    "work_mode": 0.02,  # Réduit pour garder une somme totale égale à 1.0
-}
 calculate_relevancy = partial(calculate_total_score, weights=WEIGHTS)
 
 
