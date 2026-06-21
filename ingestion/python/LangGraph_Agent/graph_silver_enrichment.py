@@ -9,25 +9,62 @@ llm = LLM()
 placesAPI = PlacesAPI(os.getenv('MAPS_APP_KEY'))
 
 # =========================== Company handle ===========================
+# =========================== Location handle ===========================
 class CompanyOutput(BaseModel):
-    company_name: str | None = Field(description="Name of the company, or null if no company is found")
-
+    company_name: str | None = Field(
+        description="Name of the company recruiting for this offer, mentioned in the text. Do not invent or mistake a software/tool name for the company name. Return null if not found."
+    )
 extract_company = Extract(
     llm=llm.llama4_smart,
     task=(
-        'Find the name of the company who recruit for this job offer based on the title and the description of the job. '
-        'The name has to be mentioned in the text, do not invent or mistake a software name for the company name, for example Microsoft.'
-        'Return only the name of the company if nothing is found return null'
+        "Find the name of the company recruiting for this job offer, based on the title and description. "
+        "The name must be explicitly mentioned in the text — do not invent it or mistake a software/tool name for it."
     ),
     output_key='company_name',
     schema=CompanyOutput,
     fields=['job_title', 'offer_description']
 )
+
+
+class LocationRawOutput(BaseModel):
+    location_raw: str | None = Field(
+        description= ("A location hint suitable for a Google Maps query. "
+        "If you can enrich the existing location_raw with city/country/offer_description, do so. "
+        "If you find nothing additional, just return the existing location_raw unchanged.")
+    )
+extract_location = Extract(
+    llm=llm.llama4_smart,
+    task=(
+        "I need a location hint to start a Google Maps API query. I don't need a precise location, "
+        "just something that indicates where the company is located. "
+        "Combine information from location_raw, city, country, and offer_description."
+    ),
+    output_key='location_raw',
+    schema=LocationRawOutput,
+    fields=['job_title', 'offer_description', 'location_raw', 'city', 'country']
+)
+
+def extract_location_node(state: JobOfferState) -> dict:
+    original_location = state.get("location_raw")
+    result = extract_location(state)
+
+    if not result.get("location_raw") or result["location_raw"] == "null":
+        result["location_raw"] = original_location
+
+    return result
+
+
+
 verify_company = make_verify_included_node(
     primary_key='company_name',
     fields=['job_title', 'offer_description'],
     fallback_value=None
 )
+
+
+find_location = FindLocation(geo_api=placesAPI)
+
+find_mails = FindMails(llm=llm)
 
 
 
@@ -41,7 +78,7 @@ class OfferAttribute(BaseModel):
             "The offer can be in any language."
         )
     )
-    is_remote: bool = Field(
+    is_remote: bool | str = Field(
         description=(
             "True if the job is fully or partially remote, False if on-site only. "
             "Infer from keywords like 'remoto', 'remote', 'teletrabajo', 'hybrid', 'presencial'."
@@ -70,6 +107,12 @@ class OfferAttribute(BaseModel):
             "Return it STRICTLY with the Norme ISO 639-1 (ex: es, en, fr, pt)"
         )
     )
+    @field_validator("is_remote", mode="before")
+    @classmethod
+    def normalize_remote(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "vrai")
+        return v
 
 extract_attributes = Extract(
     llm=llm.llama4_smart,
@@ -86,10 +129,6 @@ extract_attributes = Extract(
 
 
 
-# =========================== Location handle ===========================
-find_location = FindLocation(geo_api=placesAPI)
-
-find_mails = FindMails(llm=llm)
 
 # =========================== Skills handle ===========================
 class OfferSkills(BaseModel):
@@ -142,21 +181,87 @@ determine_relevancy = DetermineRelevancy(llm=llm.llama4_smart, profile=profile)
 calculate_relevancy = partial(calculate_total_score, weights=WEIGHTS)
 
 
+# # =========================== Route ===========================
+# # Does we need to extract company or we can keep going
+# route_to_extract_company = make_binary_route_node(
+#     primary_key="company_name",
+#     condition=[None, 'null', '', "Empresa confidencial"],
+#     node_if_true=['extract_company'], # Skip extract company
+#     node_if_false=['extract_location', 'extract_attributes', 'extract_skills']
+# )
+
+# # Can we keep dealing with this offer 
+# route_company_to_end = make_binary_route_node(
+#     primary_key="company_name",
+#     condition=[None, 'null', '', "Empresa confidencial"],
+#     node_if_true=[END], # End the graph, impossible to deal with the offer if no company
+#     node_if_false=["extract_location", "extract_attributes", "extract_skills"] # Keep going
+# )
+
+
+
+# # Graph intialisation __________________________________________________________________
+# builder = StateGraph(JobOfferState)
+
+# # Initial route ________________________________________________________________________
+# builder.add_conditional_edges(
+#     START,              # ← un VRAI nœud, déjà ajouté avec add_node
+#     route_to_extract_company,       # ← la fonction qui décide où aller
+#     ['extract_location', 'extract_attributes', 'extract_skills', 'extract_company']
+# )
+
+
+# # Company ______________________________________________________________________________
+# builder.add_sequence([
+#     ("extract_company", extract_company),
+#     ("verify_company", verify_company),
+# ])
+
+# builder.add_conditional_edges(
+#     "verify_company",              # ← un VRAI nœud, déjà ajouté avec add_node
+#     route_company_to_end,       # ← la fonction qui décide où aller
+#     ["extract_location", "extract_attributes", "extract_skills", END]
+# )
+
+# # Location & contacts ___________________________________________________________________
+# builder.add_sequence([
+#     ("extract_location", extract_location_node),
+#     ("find_location", find_location),
+#     ("find_mails", find_mails)
+# ])
+# builder.add_edge("find_mails", END)
+
+# # Scoring ______________________________________________________________________________
+# builder.add_sequence([
+#     ("determine_relevancy", determine_relevancy),
+#     ("calculate_relevancy", calculate_relevancy)
+# ])
+# builder.add_edge("calculate_relevancy", END)
+
+# # Attributes & skills ___________________________________________________________________
+# builder.add_node("extract_attributes", extract_attributes)
+# builder.add_node("extract_skills", extract_skills)
+# builder.add_edge(["extract_attributes", "extract_skills", "find_location"], "determine_relevancy")
+
+
+
+
+
 # =========================== Route ===========================
 # Does we need to extract company or we can keep going
 route_to_extract_company = make_binary_route_node(
     primary_key="company_name",
     condition=[None, 'null', '', "Empresa confidencial"],
-    node_if_true=['extract_company'], # Skip extract company
-    node_if_false=['find_location', 'extract_attributes', 'extract_skills']
+    node_if_true=['extract_company'],
+    node_if_false=['extract_location']
 )
 
 # Can we keep dealing with this offer 
 route_company_to_end = make_binary_route_node(
     primary_key="company_name",
     condition=[None, 'null', '', "Empresa confidencial"],
-    node_if_true=[END], # End the graph, impossible to deal with the offer if no company
-    node_if_false=["find_location", "extract_attributes", "extract_skills"] # Keep going
+    node_if_true=[END],
+    node_if_false=["extract_location"]
 )
 
 
@@ -166,9 +271,9 @@ builder = StateGraph(JobOfferState)
 
 # Initial route ________________________________________________________________________
 builder.add_conditional_edges(
-    START,              # ← un VRAI nœud, déjà ajouté avec add_node
-    route_to_extract_company,       # ← la fonction qui décide où aller
-    ['find_location', 'extract_attributes', 'extract_skills', 'extract_company']
+    START,
+    route_to_extract_company,
+    ['extract_location', 'extract_company']
 )
 
 
@@ -179,15 +284,18 @@ builder.add_sequence([
 ])
 
 builder.add_conditional_edges(
-    "verify_company",              # ← un VRAI nœud, déjà ajouté avec add_node
-    route_company_to_end,       # ← la fonction qui décide où aller
-    ["find_location", "extract_attributes", "extract_skills", END]
+    "verify_company",
+    route_company_to_end,
+    ["extract_location", END]
 )
 
-# Location & contacts ___________________________________________________________________
+# Location → Attributes → Skills → Mails, tout en séquentiel ___________________________
 builder.add_sequence([
+    ("extract_location", extract_location_node),
     ("find_location", find_location),
-    ("find_mails", find_mails)
+    ("extract_attributes", extract_attributes),
+    ("extract_skills", extract_skills),
+    ("find_mails", find_mails),
 ])
 builder.add_edge("find_mails", END)
 
@@ -198,16 +306,4 @@ builder.add_sequence([
 ])
 builder.add_edge("calculate_relevancy", END)
 
-# Attributes & skills ___________________________________________________________________
-builder.add_node("extract_attributes", extract_attributes)
-builder.add_node("extract_skills", extract_skills)
-builder.add_edge(["extract_attributes", "extract_skills"], "determine_relevancy")
-
-
-
-
-
-
-
-
-
+builder.add_edge("extract_skills", "determine_relevancy")

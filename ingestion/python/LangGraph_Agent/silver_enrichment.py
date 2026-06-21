@@ -18,7 +18,32 @@ from database import Database
 from APIendpoint import GeoAPI  
 import reverse_geocoder
 from ddgs import DDGS
+import re
+import time
 
+def clean_location_raw(location_raw: str) -> str:
+    """Retire les artefacts de plateforme du texte de localisation brut."""
+    if not location_raw:
+        return location_raw
+    # Retire tout ce qui suit un séparateur typique de plateforme
+    cleaned = re.split(r'•|a través de|via|through', location_raw)[0]
+    return cleaned.strip()
+
+# Grok rate limit handle
+def call_with_retry(fn, max_retries=20):
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except Exception as e:
+            error_str = str(e)
+            if "rate_limit_exceeded" in error_str:
+                match = re.search(r"try again in ([\d.]+)s", error_str)
+                wait_time = float(match.group(1)) + 1.0 if match else 8  # marge plus large
+                print(f"⏳ Rate limit atteint, attente de {wait_time:.1f}s avant retry ({attempt+1}/{max_retries})")
+                time.sleep(wait_time)
+            else:
+                raise
+    raise Exception("Trop de tentatives échouées")
 
 
 WEIGHTS = {
@@ -179,6 +204,7 @@ class Extract:
                             I did an ingestion pipeline gathering job offer via APIs, I did it to find an internship/job automatically.
                             I want you to be the more precise possible, this is important for me to have valuable and correct information.
                             Task : {self._task}
+                            ALWAYS REPLY IN ENGLISH even if the task or the text you analyse is in other language.
                             You MUST respond ONLY using the structured format provided, never write a conversational explanation.
                             If no data is found, return null or an empty list. Do not explain why, just do as the explained structure format
                             If no information is available, do not invent one and return null for this field
@@ -186,7 +212,7 @@ class Extract:
         user = HumanMessage(content=context)
 
         try:
-            response = self._llm_structured.invoke([system, user])
+            response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
             data = response.model_dump()
             if len(data) == 1:
                 return {self._output_key: next(iter(data.values()))}
@@ -258,7 +284,7 @@ class FindLocation:
 
     def __call__(self, state: JobOfferState) -> dict:
         company = state.get('company_name')
-        location = state.get('location_raw')
+        location = clean_location_raw(state.get('location_raw'))
 
         # fallback if location is null or None
         if not location or location == 'null':
@@ -270,7 +296,10 @@ class FindLocation:
 
         result = self._geo_api.search_place(company, location)
         if not result:
+            print(f"⚠️  find_location: aucun résultat pour {company} @ {location}")
             return {}
+        
+        result["location_raw"] = location  # overwrite with the cleaned value
         
         if state.get('lat') is not None:
             result['lat'] = state.get('lat')
@@ -279,7 +308,7 @@ class FindLocation:
         # If no coordinate available
         if result.get('lat') is None or result.get('lon') is None:
             return result
-        reverse_geocode = reverse_geocoder.search((result['lat'], result['lon']))
+        reverse_geocode = reverse_geocoder.search((result['lat'], result['lon']), mode=1)
         geocode = {
             'city': reverse_geocode[0]['admin1'],
             'country': reverse_geocode[0]['cc']
@@ -297,7 +326,9 @@ class EmailItem(BaseModel):
     reason: str
 
 class EmailResults(BaseModel):
-    emails: list[EmailItem]
+    emails: list[EmailItem] = Field(
+        description="List of relevant contact emails found. Return an empty list [] for the emails field if none are found, do not return an empty array as the entire response."
+    )
 
 
 class FindMails:
@@ -342,18 +373,21 @@ class FindMails:
             Exclude CEO/executive emails unless no other option is available.
             ONLY use emails present in the provided search results.
             NEVER generate an email from your general knowledge.
-            If you find an official application portal (career page, trabajando.cl, etc.)
-            instead of a direct email, indicate the URL in career_portal_url.
-            If no email is found, state it clearly.
+            You MUST respond ONLY using the structured format provided.
+            Never write conversational text. Always use the function call format.
+            If no email is found, do not write any explanatory text.
             """)
 
         user = HumanMessage(content=f"Company: {company}\nResult:\n{results}")
 
         try:
-            response = self._llm_structured.invoke([system, user])
+            response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
             contacts = [item.model_dump() for item in response.emails]
             return {"contacts": contacts}
         except Exception as e:
+            if "'[]'" in str(e) or "failed_generation': '[]'" in str(e):
+                # Le LLM a essayé de dire "aucun email" mais dans le mauvais format
+                return {"contacts": []}
             print(f"Erreur find_mails pour {company}: {e}")
             return {"contacts": []}
 
@@ -431,6 +465,9 @@ class OfferRelevancy(BaseModel):
         description=(
             "Location fit score from 0 to 10, comparing the offer's location against my target locations "
             "(provided in the system message). "
+            "Prioritize city and country if available,  they are the most reliable. "
+            "If city and country are both null, fall back on location_raw, which is less precise "
+            "but still usable to estimate the score. "
             "If the location is not specified or you can't deduce it, return null."
         )
     )
@@ -475,6 +512,7 @@ class DetermineRelevancy:
             f"contract_type: {state.get('contract_type')}",
             f"city: {state.get('city')}",
             f"country: {state.get('country')}",
+            f"location_raw: {state.get('location_raw')}",
             f"company_name: {state.get('company_name')}",
             f"alternative_job_titles: {state.get('alternative_job_titles')}",
             f"skills_languages: {state.get('skills_languages')}",
@@ -496,7 +534,7 @@ class DetermineRelevancy:
         user = HumanMessage(content=context)
 
         try:
-            response = self._llm_structured.invoke([system, user])
+            response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
             data = response.model_dump()
             
             # On extrait l'explication pour la mettre à la racine du State
