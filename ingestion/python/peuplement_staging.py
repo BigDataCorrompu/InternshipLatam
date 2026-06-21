@@ -1,4 +1,38 @@
 import sys
+
+
+import os
+import sys
+from pathlib import Path
+from dotenv import load_dotenv
+
+# 1. Calcule le chemin absolu du dossier où se trouve CE script (peuplement_staging.py)
+script_dir = Path(__file__).resolve().parent
+
+# 2. Tente de charger le .env s'il est dans le même dossier
+env_path = script_dir / ".env"
+
+# NOTE : Si ton fichier .env est un ou deux dossiers plus haut dans ton repo Perforce,
+# décommente la ligne appropriée ci-dessous :
+# env_path = script_dir.parent / ".env"         # Si le .env est dans 'ingestion/'
+# env_path = script_dir.parent.parent / ".env"  # Si le .env est dans 'InternshipLatam/'
+
+# 3. Force le chargement et affiche un retour clair pour le debug
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path, override=True)
+    print(f"✅ Fichier .env chargé avec succès depuis : {env_path}")
+else:
+    print(f"❌ Impossible de trouver le fichier .env à l'emplacement : {env_path}")
+
+# 4. Configurer les chemins d'importation
+sys.path.append(str(script_dir / "src"))
+sys.path.append(str(script_dir / "LangGraph_Agent"))
+
+# 5. Tes imports locaux
+from silver_enrichment import *
+from database import Database
+# ... (le reste de tes imports)
+
 sys.path.append("./src")
 sys.path.append("./LangGraph_Agent")
 
@@ -65,7 +99,7 @@ def main():
             remaining = (len(raw) - (i + 1)) * avg_per_offer
             print(f"✅ Batch inséré ({i+1}/{len(raw)}) — écoulé: {elapsed/60:.1f}min, restant estimé: {remaining/60:.1f}min")
             results = []
-        time.sleep(20)
+        # time.sleep(20)
 
     if results:  # dernier batch incomplet
         db.bulk_insert(table="staging.enriched_offers", columns=columns, data=results)

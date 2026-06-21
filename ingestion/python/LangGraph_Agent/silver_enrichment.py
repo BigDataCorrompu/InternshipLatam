@@ -8,6 +8,7 @@ from rapidfuzz import fuzz, process
 from pydantic import BaseModel, field_validator, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_groq import ChatGroq
+from langchain_ollama import ChatOllama
 from dotenv import load_dotenv
 import operator
 from typing import Annotated
@@ -60,8 +61,11 @@ WEIGHTS = {
 class LLM:
     def __init__(self, groq_key: str=None):
         self._groq_key = groq_key or os.getenv("GROQ_APP_KEY")
-        self.llama3_smart = ChatGroq(model="llama-3.3-70b-versatile", api_key=self._groq_key, temperature=0)
-        self.llama4_smart = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self._groq_key, temperature=0)
+        self.llama3_smart = ChatOllama(model="llama3.2", temperature=0)
+        self.llama4_smart = ChatOllama(model="llama3.2", temperature=0)
+
+        # self.llama3_smart = ChatGroq(model="llama-3.3-70b-versatile", api_key=self._groq_key, temperature=0)
+        # self.llama4_smart = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self._groq_key, temperature=0)
 
         # Problem of formatting with this model use an another one
         # self.llm_fast  = ChatGroq(model="llama-3.1-8b-instant", api_key=self._groq_key, temperature=0)
@@ -177,6 +181,7 @@ def map_bronze_to_JobOfferState(row: dict) -> JobOfferState:
 
         # ── analytics.company_contact ──
         "contacts": [],
+        "search_query_mail": None
     }
 
     
@@ -318,7 +323,7 @@ class FindLocation:
 
 # Mails
 class SearchQueryOutput(BaseModel):
-    query: str = Field(description="Optimized search query to find HR/recruitment contact email")
+    search_query_mail: str = Field(description="Optimized search query to find HR/recruitment contact email")
 
 class EmailItem(BaseModel):
     email: str
@@ -345,7 +350,7 @@ class FindMails:
                 "in the local language. "
                 "Adapt the language of your query to the country: Spanish for Chile, Argentina, Uruguay."
             ),
-            output_key="search_query",
+            output_key="search_query_mail",
             schema=SearchQueryOutput,
             fields=["company_name", "city", "country"]
         )
@@ -353,15 +358,20 @@ class FindMails:
     
     def __call__(self, state: JobOfferState) -> dict:
         company = state.get("company_name")
+        
         if not company or company == 'null':
-            return {'contacts': []}
+            print(f"⚠️  find_mails: pas de company_name, recherche annulée — search_query_mail=None")
+            return {'contacts': [], 'search_query_mail': None}
         
         query_result = self._generate_query(state)
-        query = query_result["search_query"]
+        search_query_mail = query_result["search_query_mail"]
+        print(f"🔍 find_mails: {company} — search_query_mail='{search_query_mail}'")
 
-        results = self._search_ddg(query)
+        results = self._search_ddg(search_query_mail)
         if not results:
-            return {"contacts": []}
+            print(f"⚠️  find_mails: aucun résultat DDG pour {company} — search_query_mail='{search_query_mail}'")
+            return {"contacts": [], "search_query_mail": search_query_mail}
+        print(f"📄 find_mails: {len(results)} caractères reçus pour {company} — search_query_mail='{search_query_mail}'")
                 
         system = SystemMessage(content="""
             You are an assistant that extracts company contact emails.
@@ -383,13 +393,18 @@ class FindMails:
         try:
             response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
             contacts = [item.model_dump() for item in response.emails]
-            return {"contacts": contacts}
+            if not contacts:
+                print(f"⚠️  find_mails: LLM n'a trouvé aucun email pour {company} — search_query_mail='{search_query_mail}'")
+            else:
+                print(f"✅ find_mails: {len(contacts)} contact(s) pour {company} — search_query_mail='{search_query_mail}'")
+            return {"contacts": contacts, "search_query_mail": search_query_mail}
         except Exception as e:
             if "'[]'" in str(e) or "failed_generation': '[]'" in str(e):
+                print(f"⚠️  find_mails: réponse vide interceptée pour {company} — search_query_mail='{search_query_mail}'")
                 # Le LLM a essayé de dire "aucun email" mais dans le mauvais format
-                return {"contacts": []}
-            print(f"Erreur find_mails pour {company}: {e}")
-            return {"contacts": []}
+                return {"contacts": [], "search_query_mail": search_query_mail}
+            print(f"❌ find_mails: erreur pour {company} — search_query_mail='{search_query_mail}': {e}")
+            return {"contacts": [], "search_query_mail": search_query_mail}
 
     def _search_ddg(self, query: str, max_results: int = 10) -> str:
         try:
