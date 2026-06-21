@@ -340,15 +340,21 @@ class FindMails:
     def __init__(self, llm):
         self._generate_query = Extract(
             llm=llm.llama3_smart, 
+            # task=(
+            #     "Generate a SHORT and FOCUSED search query (max 4-5 words) to find an HR or recruitment contact email "
+            #     "for this company. "
+            #     "If the company website is known, use 'site:domain.com' combined with ONE or TWO relevant keywords only "
+            #     "(e.g. 'contact' or 'careers', adapted to the local language). "
+            #     "Do NOT combine multiple languages or multiple countries in the same query. "
+            #     "Pick ONE language based on the offer's country."
+            # ),
             task=(
-                "Generate an optimized search query to find an HR, recruitment, or technical contact email "
-                "for this company. "
-                "If the company website is known, prioritize a query using 'site:domain.com' combined with "
-                "terms like 'contact', 'careers', 'jobs', 'rrhh', 'recursos humanos', or 'trabaja con nosotros' "
-                "(adapted to the local language). "
-                "If no website is known, build a query using the company name plus contact/careers/HR keywords "
-                "in the local language. "
-                "Adapt the language of your query to the country: Spanish for Chile, Argentina, Uruguay."
+                "Generate ONE single-line search query (no line breaks, no multiple options) "
+                "to find an HR or recruitment contact email for this company. "
+                "Maximum 8 words. "
+                "If you know the company website, use 'site:domain.com' plus ONE keyword like 'contacto' or 'contact'. "
+                "Otherwise, just use the company name plus 'contacto email' or 'contact email careers'. "
+                "Use Spanish keywords if the company is in Latin America, English otherwise."
             ),
             output_key="search_query_mail",
             schema=SearchQueryOutput,
@@ -366,6 +372,15 @@ class FindMails:
         query_result = self._generate_query(state)
         search_query_mail = query_result["search_query_mail"]
         print(f"🔍 find_mails: {company} — search_query_mail='{search_query_mail}'")
+
+        # Fallback si le LLM n'a pas pu générer une requête de recherche
+        if "\n" in search_query_mail:
+            search_query_mail = search_query_mail.replace("\n", " ").strip()
+            print(f"⚠️  find_mails: retour à la ligne détecté pour {company}, nettoyé → '{search_query_mail}'")
+        if not search_query_mail or search_query_mail.strip().lower() == "null":
+            country = state.get("country", "")
+            search_query_mail = f"{company} contacto email {country}".strip()
+            print(f"⚠️  find_mails: query LLM invalide pour {company}, fallback basique → '{search_query_mail}'")
 
         results = self._search_ddg(search_query_mail)
         if not results:
