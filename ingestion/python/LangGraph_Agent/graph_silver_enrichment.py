@@ -45,9 +45,10 @@ class OfferAttribute(BaseModel):
         description=(
             "True if the job is fully or partially remote, False if on-site only. "
             "Infer from keywords like 'remoto', 'remote', 'teletrabajo', 'hybrid', 'presencial'."
-            "A raw is_remote value extracted from the source platform is also provided as a hint — "
+            "A raw is_remote value extracted from the source platform is also provided as a hint, "
             "use it only when the text itself is ambiguous or silent, the text always takes priority if it contradicts the hint. "
             "The offer can be in any language."
+            "If you can't determine if it's remote just return False"
         )
     )
     contract_type: Literal["internship", "fulltime", "parttime", "freelance", "unknown"] = Field(

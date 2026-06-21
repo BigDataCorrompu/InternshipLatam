@@ -5,8 +5,7 @@ from langchain_core.messages import AnyMessage, HumanMessage, ToolMessage
 import operator
 import json
 from rapidfuzz import fuzz, process
-from pydantic import BaseModel, field_validator
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, field_validator, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
