@@ -102,7 +102,7 @@ class JobOfferState(TypedDict):
     location_raw: str | None    
     offer_url: str | None   
     source_platform: str | None   
-    offer_language: Annotated[list[str], operator.add] | None  
+    spoken_languages_required: Annotated[list[str], operator.add] | None  
     published_at: str | None   
     collected_at: str
 
@@ -549,7 +549,7 @@ class DetermineRelevancy:
     def __call__(self, state: JobOfferState) -> dict:
         context = "\n".join([
             f"job_title: {state.get('job_title')}",
-            f"offer_language: {state.get('offer_language')}",
+            f"spoken_languages_required: {state.get('spoken_languages_required')}",
             f"seniority: {state.get('seniority')}",
             f"is_remote: {state.get('is_remote')}",
             f"contract_type: {state.get('contract_type')}",
