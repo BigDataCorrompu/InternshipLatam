@@ -62,7 +62,7 @@ class LLM:
     def __init__(self, groq_key: str=None):
         self._groq_key = groq_key or os.getenv("GROQ_APP_KEY")
         # Need to pay if groq
-        self.enrichement = None
+        self._enrichement = None
 
         self.llama3_smart = ChatGroq(model="llama-3.3-70b-versatile", api_key=self._groq_key, temperature=0)
         self.llama4_smart = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self._groq_key, temperature=0)
@@ -72,7 +72,7 @@ class LLM:
     @property
     def enrichement(self):
         """Only import Ollama if the key is requiered"""
-        if self.enrichement is None:
+        if self._enrichement is None:
             from langchain_ollama import ChatOllama
             self._enrichement = ChatOllama(model="llama3.2", temperature=0)
         return self._enrichement
