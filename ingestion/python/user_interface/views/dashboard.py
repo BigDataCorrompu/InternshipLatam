@@ -455,6 +455,19 @@ def group_small_categories(counts: pd.Series, threshold_pct: float = 0.01, other
         counts.loc[other_label] = other_total
     return counts
 
+# ══════════════════════════════════════════════════════════════════
+# Offers table
+# ══════════════════════════════════════════════════════════════════
+def render_offers_table(d: pd.DataFrame) -> None:
+    if d.empty:
+        return
+    show_cols = [c for c in ["job_title", "company_name", "city", "country",
+                             "seniority", "score_relevancy"] if c in d.columns]
+    st.subheader("📋 Offers")
+    st.dataframe(d[show_cols], hide_index=True, width="stretch")
+
+
+
 
 def build_dashboard(d: pd.DataFrame) -> None:
 
@@ -541,6 +554,8 @@ def build_dashboard(d: pd.DataFrame) -> None:
         view_state = pdk.ViewState(latitude=-25.0, longitude=-60.0, zoom=2.5, pitch=0)
         deck = pdk.Deck(layers=[], initial_view_state=view_state)
         st.pydeck_chart(deck)
+
+    render_offers_table(d)
 
     # ── Country pie chart ────────────────────────────────────────
     col1, col2 = st.columns(2)
@@ -638,19 +653,7 @@ build_dashboard(filtered_df)
 st.caption(f"**{len(filtered_df)}** offers match the filters (out of {len(df)}).")
 
 
-# ══════════════════════════════════════════════════════════════════
-# Offers table
-# ══════════════════════════════════════════════════════════════════
-def render_offers_table(d: pd.DataFrame) -> None:
-    if d.empty:
-        return
-    show_cols = [c for c in ["job_title", "company_name", "city", "country",
-                             "seniority", "score_relevancy"] if c in d.columns]
-    st.subheader("📋 Offers")
-    st.dataframe(d[show_cols], hide_index=True, width="stretch")
 
-
-render_offers_table(filtered_df)
 
 
 # ══════════════════════════════════════════════════════════════════
