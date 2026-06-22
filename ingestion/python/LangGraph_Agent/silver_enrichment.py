@@ -8,7 +8,6 @@ from rapidfuzz import fuzz, process
 from pydantic import BaseModel, field_validator, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_groq import ChatGroq
-# from langchain_ollama import ChatOllama
 from dotenv import load_dotenv
 import operator
 from typing import Annotated
@@ -72,10 +71,14 @@ class LLM:
     @property
     def enrichement(self):
         """Only import Ollama if the key is requiered"""
-        if self._enrichement is None:
+        try:
             from langchain_ollama import ChatOllama
-            self._enrichement = ChatOllama(model="llama3.2", temperature=0)
-        return self._enrichement
+            if self._enrichement is None:
+                self._enrichement = ChatOllama(model="llama3.2", temperature=0)
+            return self._enrichement
+        except Exception as e:
+            st.error("Ollama n'est pas disponible sur cet environnement.")
+            return None
 
         
 # =========================== STATE ===========================
