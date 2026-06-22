@@ -5,33 +5,33 @@ import plotly.express as px          # ⚠️ corrigé : était `import plotly a
 # from fake_offer import fake_job_offers
 
 import time
-import sys
 import os
+import sys
 
+# 1. Récupère le chemin absolu du dossier 'python' (parent commun)
+# __file__ est dans user_interface/, son parent ('..') est python/
+dossier_parent = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-# 1. Récupère le chemin du dossier parent commun
-dossier_parent = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# 2. Construit les chemins vers les dossiers contenant vos modules
+# Note : 'database' est généralement dans 'user_interface' ou à la racine de 'python'
+dossier_agent = os.path.join(dossier_parent, "LangGraph_Agent")
+dossier_ui = os.path.join(dossier_parent, "user_interface")
 
-# 2. Construit le chemin pour le premier dossier voisin
-voisin_1 = os.path.join(dossier_parent, 'src')
-
-# 3. Construit le chemin pour le deuxième dossier voisin
-voisin_2 = os.path.join(dossier_parent, 'LangGraph_Agent')
-
-# 4. Ajoute les deux dossiers au système de recherche de Python
-for dossier in [voisin_1, voisin_2]:
+# 3. Ajoute les dossiers au système de recherche de Python s'ils n'y sont pas
+for dossier in [dossier_parent, dossier_agent, dossier_ui]:
     if dossier not in sys.path:
         sys.path.append(dossier)
 
-# 5. Importe vos fichiers respectifs
+# 4. Importations des modules locaux
 from database import Database
-from silver_enrichment import *          # LLM, DetermineRelevancy, calculate_total_score, WEIGHTS, ...
+from silver_enrichment import *
 from dashboard_agent import (
-    run_agent,
+    SETTINGS,
     extract_profile_keywords,
     resolve_id_column,
-    SETTINGS,
+    run_agent,
 )
+
 
 
 # ══════════════════════════════════════════════════════════════════
