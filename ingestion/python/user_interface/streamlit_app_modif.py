@@ -25,7 +25,7 @@ for dossier in [dossier_parent, dossier_agent, dossier_src, dossier_ui]:
 
 # 4. Importations des modules locaux
 from database import Database
-from silver_enrichment import *
+from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 
 
@@ -41,8 +41,12 @@ def get_db_connection():
 
 @st.cache_resource
 def get_llm():
-    # LLM vient de silver_enrichment ; clé depuis les secrets Streamlit
-    return LLM(groq_key=st.secrets["groq"]["api_key"])
+    # Client Groq direct — indépendant de silver_enrichment / Ollama
+    return ChatGroq(
+        model="llama-3.3-70b-versatile",
+        api_key=st.secrets["groq"]["api_key"],
+        temperature=0,
+    )
 
 
 @st.cache_data(ttl=600, show_spinner="Fetching real data from database...")
@@ -440,6 +444,6 @@ if prompt:
     st.session_state["chat_history"].append(("user", prompt))
     llm = get_llm()
     with st.spinner("Thinking…"):
-        resp = llm.llama3_smart.invoke([HumanMessage(content=prompt)])
+        resp = llm.invoke([HumanMessage(content=prompt)])
     st.session_state["chat_history"].append(("assistant", resp.content))
     st.rerun()

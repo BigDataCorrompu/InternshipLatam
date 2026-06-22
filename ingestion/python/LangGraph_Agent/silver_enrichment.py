@@ -70,15 +70,18 @@ class LLM:
     
     @property
     def enrichement(self):
-        """Only import Ollama if the key is requiered"""
-        try:
-            from langchain_ollama import ChatOllama
-            if self._enrichement is None:
+        # Vérification environnementale (ex: variable d'environnement sur le Cloud)
+        if os.getenv("STREAMLIT_RUNTIME") == "true": 
+             # Le Cloud n'a pas accès à Ollama local
+             raise RuntimeError("Ollama n'est pas disponible sur le Cloud.")
+
+        if self._enrichement is None:
+            try:
+                from langchain_ollama import ChatOllama
                 self._enrichement = ChatOllama(model="llama3.2", temperature=0)
-            return self._enrichement
-        except Exception as e:
-            st.error("Ollama n'est pas disponible sur cet environnement.")
-            return None
+            except ImportError:
+                print("Bibliothèque langchain-ollama non trouvée.")
+        return self._enrichement
 
         
 # =========================== STATE ===========================
