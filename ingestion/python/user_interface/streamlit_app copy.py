@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px          # ⚠️ corrigé : était `import plotly as px` (cassait scatter_mapbox/pie/bar)
-# from fake_offer import fake_job_offers
+import plotly as px
+from fake_offer import fake_job_offers 
 
 import time
 import sys
@@ -23,118 +23,83 @@ for dossier in [voisin_1, voisin_2]:
     if dossier not in sys.path:
         sys.path.append(dossier)
 
-# 5. Importe vos fichiers respectifs
+# 5. Importe vos fichiers respectifs 
 from database import Database
-from silver_enrichment import *          # LLM, DetermineRelevancy, calculate_total_score, WEIGHTS, ...
-from dashboard_agent import (
-    run_agent,
-    extract_profile_keywords,
-    resolve_id_column,
-    SETTINGS,
-)
+from silver_enrichment import *
 
 
-# ══════════════════════════════════════════════════════════════════
-# Ressources & cache (LLM, profil, README)
-# ══════════════════════════════════════════════════════════════════
+# agent.py
+import streamlit as st
+from groq import Groq
+
+
+query = """SELECT
+    id_offer,
+    api_source,
+    job_title,
+    contract_type,
+    is_remote,
+    offer_languages,
+    seniority,
+    (
+        SELECT jsonb_agg(DISTINCT val)
+        FROM (
+            SELECT jsonb_array_elements_text(
+                -- Utilisation de array_to_json() pour uniformiser les types en jsonb
+                COALESCE(array_to_json(skills_languages)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_frameworks)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_aptitudes)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_soft)::jsonb, '[]'::jsonb) ||
+                COALESCE(array_to_json(alternative_job_titles)::jsonb, '[]'::jsonb)
+            ) AS val
+        ) sub
+    ) AS all_skills,
+    score_relevancy,
+    explanation,
+    company_name,
+    website,
+    primary_type,
+    city,
+    country,
+    lat,
+    lon,
+    offer_url,
+    published_at,
+    collected_at
+FROM serving.job_offer;
+"""
+
 # # 1. Connexion persistante (Resource)
 @st.cache_resource
 def get_db_connection():
     # Retourne ton objet Database
     return Database(**st.secrets["database"])
 
-@st.cache_resource
-def get_llm():
-    # LLM vient de silver_enrichment ; clé depuis les secrets Streamlit
-    return LLM(groq_key=st.secrets["groq"]["api_key"])
+# # 2. Chargement des données (Data)
+@st.cache_data(ttl=3600) # ttl=3600 recharge les données toutes les heures
+def load_data(query: str):
+    db = get_db_connection() # On appelle la connexion ici
+    data = db.execute(query)
+    return pd.DataFrame(data)
+     
+
+def refresh_data_if_needed():
+    # On utilise le session_state pour que ça ne tourne qu'une fois par visiteur
+    if 'data_refreshed' not in st.session_state:
+        with st.spinner("Réveil de la base de données... un instant."):
+            try:
+                db = get_db_connection()
+                db.execute("SELECT serving.refresh_job_offer_if_stale();")
+                st.session_state['data_refreshed'] = True
+            except Exception as e:
+                st.error(f"Erreur de connexion : {e}")
+
+# Appel de la fonction dès le lancement
+refresh_data_if_needed()
 
 
-@st.cache_data(show_spinner=False)
-def get_profile_keywords(profile_text: str):
-    """Extraction des mots-clés du profil — mise en cache car le profil change rarement."""
-    if not (profile_text or "").strip():
-        return None
-    llm = get_llm()
-    # llama4_smart : plus conservateur (préfère null à l'hallucination)
-    return extract_profile_keywords(llm.llama4_smart, profile_text)
-
-
-@st.cache_data(show_spinner=False)
-def load_readme() -> str:
-    """Charge la doc projet (README) comme contexte pour la fonctionnalité INFO."""
-    candidates = [
-        os.path.join(dossier_parent, "README.md"),
-        os.path.join(dossier_parent, "..", "README.md"),
-        os.path.join(os.path.dirname(__file__), "README.md"),
-        os.path.join(dossier_parent, "Documentation.md"),
-        os.path.join(dossier_parent, "ProjetLatam.md"),
-    ]
-    for path in candidates:
-        try:
-            if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as fh:
-                    return fh.read()
-        except Exception:
-            continue
-    # Fallback minimal si aucun fichier trouvé
-    return (
-        "InternshipLatam — automated data pipeline that collects, enriches and scores "
-        "Data-Engineering internship/job offers in Latin America (Chile, Argentina, Uruguay). "
-        "Architecture Bronze/Silver/Gold: Airflow ingestion (JSearch, CareerJet) -> LangGraph "
-        "enrichment with Groq (company, geolocation, contacts, relevancy scoring) -> PostgreSQL "
-        "on Neon -> Streamlit dashboard. The chat supports FILTER (apply filters), MATCH (rank "
-        "offers against your profile) and INFO (answer questions about the project)."
-    )
-@st.cache_data(ttl=600, show_spinner="Fetching real data from database...")
-def load_real_offers():
-    # Connects automatically using [connections.postgresql] from secrets.toml
-    db = get_db_connection()
-    
-    query = """
-    SELECT
-        id_offer as job_id,
-        api_source,
-        job_title,
-        contract_type,
-        is_remote,
-        offer_languages,
-        seniority,
-        (
-            SELECT jsonb_agg(DISTINCT val)
-            FROM (
-                SELECT jsonb_array_elements_text(
-                    COALESCE(array_to_json(skills_languages)::jsonb, '[]'::jsonb) || 
-                    COALESCE(array_to_json(skills_frameworks)::jsonb, '[]'::jsonb) || 
-                    COALESCE(array_to_json(skills_aptitudes)::jsonb, '[]'::jsonb) || 
-                    COALESCE(array_to_json(skills_soft)::jsonb, '[]'::jsonb) ||
-                    COALESCE(array_to_json(alternative_job_titles)::jsonb, '[]'::jsonb)
-                ) AS val
-            ) sub
-        ) AS all_skills,
-        score_relevancy,
-        explanation,
-        company_name,
-        website,
-        primary_type,
-        city,
-        country,
-        lat as latitude,   -- Aliased for Plotly map compatibility
-        lon as longitude,  -- Aliased for Plotly map compatibility
-        offer_url,
-        published_at,
-        collected_at
-    FROM serving.job_offer;
-    """
-    db.execute('SELECT serving.refresh_job_offer_if_stale();')
-    return db.execute(query)
-
-
-
-# ══════════════════════════════════════════════════════════════════
-# Données (fake data en dev)
-# ══════════════════════════════════════════════════════════════════
-# Load the real dataframe
-df = pd.DataFrame(load_real_offers())
+# st.dataframe(df)
+df = pd.DataFrame(fake_job_offers)
 
 st.set_page_config(page_title="AI Job Offer Dashboard Latam", page_icon="🏙️", layout="wide")
 st.title("🏙️ AI Job Offer Dashboard Latam")
@@ -145,10 +110,6 @@ st.title("🏙️ AI Job Offer Dashboard Latam")
 df["is_remote"] = df["is_remote"].fillna(False)
 df["country"] = df["country"].fillna("Not specified")
 df["company_name"] = df["company_name"].fillna("unknown")
-
-if "collected_at" in df.columns:
-    df["collected_at"] = pd.to_datetime(df["collected_at"])
-
 
 # ══════════════════════════════════════════════════════════════════
 # Lists for widgets
@@ -221,19 +182,12 @@ def apply_filters(df: pd.DataFrame, f: dict) -> pd.DataFrame:
         out = out[out["offer_languages"].apply(lambda langs: any(l in langs for l in f["languages"]))]
     if f["seniorities"]:
         out = out[out["seniority"].isin(f["seniorities"])]
-    if f.get("companies"):                       # ➕ décision #5 : on lit enfin le filtre companies
-        out = out[out["company_name"].isin(f["companies"])]
     if f["remote"] is not None:
         out = out[out["is_remote"] == f["remote"]]
 
     # "All time" = no date filter
-# "All time" = no date filter
     if f["max_days"] != "All time" and "collected_at" in out.columns:
-        # Extract the timezone from the column (returns None if naive, or the tz if aware)
-        column_tz = out["collected_at"].dt.tz
-        
-        # Inject that timezone into the current timestamp
-        cutoff = pd.Timestamp.now(tz=column_tz) - pd.Timedelta(days=f["max_days"])
+        cutoff = pd.Timestamp.now() - pd.Timedelta(days=f["max_days"])
         out = out[out["collected_at"] >= cutoff]
 
     return out
@@ -253,8 +207,8 @@ def default_filters() -> dict:
         "seniorities": list(ALL_SENIORITIES),   # all checked by default (intentional)
         "remote":      None,                     # None = "All" (no filter)
         "max_days":    30,
-        "companies":   [],                        # pas de widget, piloté par le chat (décision #5)
-        # `top_n` retiré : config morte, déplacé en interne du MATCH (SETTINGS.fuzzy_pool_size — décision #6)
+        "companies":   [],                        # no widget tonight, kept for later
+        "top_n":       10,                         # no widget tonight
     }
 
 if "filters" not in st.session_state:
@@ -319,21 +273,9 @@ with st.sidebar:
     if st.button("♻️ Reset filters"):
         st.session_state["filters"] = default_filters()
         st.session_state["_filters_dirty"] = True
-        st.session_state.pop("match_results", None)
-        st.session_state.pop("match_offer_ids", None)
         st.rerun()
 
     st.checkbox("🤖 Try AI agent", value=False, key="w_use_agent")
-
-    # ── Profil utilisateur (utilisé par la fonctionnalité MATCH) ──
-    with st.expander("🧑 Your profile (for matching)"):
-        st.text_area(
-            "Describe your skills, target role, languages…",
-            key="user_profile",
-            placeholder="e.g. Junior Data Engineer. Python, SQL, Airflow, Docker, LangGraph. "
-                        "Looking for a data engineering internship in Latin America. English C1, French native.",
-            height=160,
-        )
 
     st.divider()
     st.write("Dashboard developed by X")
@@ -368,7 +310,7 @@ def build_dashboard(d: pd.DataFrame) -> None:
     st.metric("📦 Offers currently displayed", len(d))
 
     # ── Map ──────────────────────────────────────────────────────
-    if {"latitude", "longitude"}.issubset(d.columns):
+    if {"lat", "lon"}.issubset(d.columns):
         map_df = d.dropna(subset=["latitude", "longitude"])
         if not map_df.empty:
             fig_map = px.scatter_mapbox(
@@ -460,107 +402,3 @@ filtered_df = apply_filters(df, f)
 st.subheader("📊 Dashboard")
 build_dashboard(filtered_df)
 st.caption(f"**{len(filtered_df)}** offers match the filters (out of {len(df)}).")
-
-
-# ══════════════════════════════════════════════════════════════════
-# Offers table — surligne les offres matchées par le chat (décision #4)
-# ══════════════════════════════════════════════════════════════════
-def render_offers_table(d: pd.DataFrame) -> None:
-    if d.empty:
-        return
-    matched = set(st.session_state.get("match_offer_ids", []))
-
-    disp = d.copy()
-    id_col = resolve_id_column(disp)
-    disp["_offer_id"] = disp[id_col].astype(str) if id_col else disp.index.astype(str)
-
-    show_cols = [c for c in ["job_title", "company_name", "city", "country",
-                             "seniority", "is_remote", "score_relevancy"] if c in disp.columns]
-    view = disp[show_cols + ["_offer_id"]]
-
-    def _row_style(r):
-        on = r["_offer_id"] in matched
-        css = "background-color:#264653; color:white" if on else ""
-        return [css for _ in r.index]
-
-    st.subheader("📋 Offers")
-    if matched:
-        st.caption("Rows highlighted in green were matched to your profile by the assistant.")
-    styler = view.style.apply(_row_style, axis=1)
-    st.dataframe(styler, hide_index=True, use_container_width=True, column_order=show_cols)
-
-
-render_offers_table(filtered_df)
-
-
-# ══════════════════════════════════════════════════════════════════
-# Match results — tableau détaillé renvoyé par la fonctionnalité MATCH
-# ══════════════════════════════════════════════════════════════════
-if st.session_state.get("match_results") is not None:
-    mt = st.session_state["match_results"]
-    if not mt.empty:
-        st.subheader("🎯 Offers matching your profile")
-        nice = mt.copy()
-        nice["matched"] = nice["matched"].apply(
-            lambda v: ", ".join(v) if isinstance(v, list) else ""
-        )
-        nice = nice.rename(columns={
-            "job_title": "Title",
-            "company_name": "Company",
-            "matched": "Matched keywords",
-            "coverage": "Keywords matched",
-        })[["Title", "Company", "Matched keywords", "Keywords matched"]]
-        st.dataframe(nice, hide_index=True, use_container_width=True)
-
-
-# ══════════════════════════════════════════════════════════════════
-# 💬 Assistant (FILTER / MATCH / INFO) — visible si la case est cochée
-# ══════════════════════════════════════════════════════════════════
-def handle_user_message(prompt: str) -> None:
-    """Appelle l'agent (pur) et applique ici les effets de bord (filtres, match, message)."""
-    llm = get_llm()
-    pk = get_profile_keywords(st.session_state.get("user_profile", ""))
-
-    result = run_agent(
-        llm=llm,
-        message=prompt,
-        df=df,
-        user_profile=st.session_state.get("user_profile", ""),
-        current_filters=st.session_state["filters"],
-        readme_text=load_readme(),
-        apply_filters_fn=apply_filters,
-        default_filters_fn=default_filters,
-        profile_keywords=pk,
-        settings=SETTINGS,
-    )
-
-    # FILTER -> merge dans la source de vérité + resync sidebar au prochain run
-    if result.new_filters:
-        st.session_state["filters"].update(result.new_filters)
-        st.session_state["_filters_dirty"] = True
-
-    # MATCH -> stocke résultats + ids pour le surlignage
-    if result.match_table is not None:
-        st.session_state["match_results"] = result.match_table
-        st.session_state["match_offer_ids"] = result.response.offer_ids
-
-    st.session_state["chat_history"].append(("assistant", result.response.message))
-
-
-if st.session_state.get("w_use_agent"):
-    st.divider()
-    st.subheader("💬 Assistant")
-
-    if "chat_history" not in st.session_state:
-        st.session_state["chat_history"] = []
-
-    for role, content in st.session_state["chat_history"]:
-        with st.chat_message(role):
-            st.markdown(content)
-
-    prompt = st.chat_input("Filter offers, match your profile, or ask about the project…")
-    if prompt:
-        st.session_state["chat_history"].append(("user", prompt))
-        with st.spinner("Thinking…"):
-            handle_user_message(prompt)
-        st.rerun()

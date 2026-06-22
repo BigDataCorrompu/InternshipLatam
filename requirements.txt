@@ -8,3 +8,14 @@ langgraph-checkpoint==3.0.1
 langgraph-prebuilt==1.0.4
 langgraph-sdk==0.2.9
 langchain-core==1.4.2
+streamlit
+pandas
+plotly
+rapidfuzz
+pydantic
+langgraph
+langchain
+langchain-core
+langchain-groq
+psycopg2-binary
+sqlalchemy
