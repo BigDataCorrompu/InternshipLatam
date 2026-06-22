@@ -1,6 +1,6 @@
-# Schema analytics
+## Schema Silver
 
-```Mermaid
+```mermaid
 erDiagram
   job_offer {
     VARCHAR id_offer PK

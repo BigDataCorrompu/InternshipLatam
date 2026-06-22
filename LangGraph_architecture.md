@@ -1,4 +1,6 @@
-# Silver Enrichment — Nodes
+## LangGraph Database enrichment
+
+### Silver Enrichment — Nodes
 
 | Graph | Node | Input | Output | Tools | Why |
 | --- | --- | --- | --- | --- | --- |
@@ -7,14 +9,14 @@
 | 1C | `verify_company` | `company_name`, `job_title`, `offer_description` | `company_name` | — | Verify the LLM isn't hallucinating with a fuzzy match check. |
 | 1D | `route_company_to_end` | `company_name` | — | — |  |
 | 1E | `extract_location` | `job_title`, `offer_description`, `location_raw`, `city`, `country` | `location_raw` | LLM | Enriches the raw location with hints from the title/description (e.g. city in parentheses) before querying the geolocation API. Falls back to the original `location_raw` if nothing is found. |
-| 2E | `extract_attributes` | `job_title`, `offer_description` | `seniority`, `is_remote`, `contract_type`, `offer_language` | LLM | Is included in the description or the title. |
+| 2E | `extract_attributes` | `job_title`, `offer_description` | `seniority`, `is_remote`, `contract_type`, `spoken_languages_required` | LLM | Is included in the description or the title. |
 | 1F | `find_location` | `company_name`, `location_raw`, `city` | `address`, `city`, `country`, `lat`, `lon`, `phone`, `business_status`, `company_website` | Google Maps Places API | Use the enriched location_raw, present 100% in a sample of 860 offers. |
 | 1G | `find_mails` | `company_name`, `city`, `country` | `contacts` | LLM, DuckDuckGo (DDGS) | APIs are too limited for my budget or many APIs should have been setup. |
-| 3E | `extract_skills` | `job_title`, `offer_description` | `skills_languages`, `skills_framework`, `skills_aptitudes`, `skills_soft` | LLM | Present in human language. |
-| 2F | `determine_relevancy` | `job_title`, `offer_language`, `seniority`, `is_remote`, `contract_type`, `city`, `country`, `company_name`, `skills_languages`, `skills_framework`, `skills_aptitudes`, `skills_soft` | `score_skills`, `score_language`, `score_seniority`, `score_work_mode`, `score_company`, `score_location`, `explanation`, `prompt_relevancy` | LLM | The LLM attributes a grade matching the offer with a personalized profile describing the compatibility and the needs of the user. The LLM returns an explanation in human language. |
+| 3E | `extract_skills` | `job_title`, `offer_description` | `skills_languages`, `skills_framework`, `skills_aptitudes`, `skills_soft`, `alternative_job_titles` | LLM | Present in human language. |
+| 2F | `determine_relevancy` | `job_title`, `spoken_languages_required`, `seniority`, `is_remote`, `contract_type`, `city`, `country`, `company_name`, `skills_languages`, `skills_framework`, `skills_aptitudes`, `skills_soft` | `score_skills`, `score_language`, `score_seniority`, `score_work_mode`, `score_company`, `score_location`, `explanation`, `prompt_relevancy` | LLM | The LLM attributes a grade matching the offer with a personalized profile describing the compatibility and the needs of the user. The LLM returns an explanation in human language. |
 | 2G | `calculate_relevancy` | `score_skills`, `score_language`, `score_seniority`, `score_work_mode`, `score_company`, `score_location` | `score_relevancy` | — | Weighted function to calculate a final value depending on the different scores given by the AI. |
 
-# Silver Enrichment — Graph  
+### Silver Enrichment — Graph  
 
 ```mermaid
 flowchart LR
@@ -79,3 +81,4 @@ flowchart LR
     1G_find_mails --> END:::terminal
     2G_calculate_relevancy --> END
 ```
+

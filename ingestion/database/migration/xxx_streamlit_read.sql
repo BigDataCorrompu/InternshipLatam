@@ -1,5 +1,5 @@
 SELECT
-    id_offer,
+    id_offer as job_id,
     api_source,
     job_title,
     contract_type,
@@ -10,7 +10,6 @@ SELECT
         SELECT jsonb_agg(DISTINCT val)
         FROM (
             SELECT jsonb_array_elements_text(
-                -- Utilisation de array_to_json() pour uniformiser les types en jsonb
                 COALESCE(array_to_json(skills_languages)::jsonb, '[]'::jsonb) || 
                 COALESCE(array_to_json(skills_frameworks)::jsonb, '[]'::jsonb) || 
                 COALESCE(array_to_json(skills_aptitudes)::jsonb, '[]'::jsonb) || 
@@ -18,7 +17,7 @@ SELECT
                 COALESCE(array_to_json(alternative_job_titles)::jsonb, '[]'::jsonb)
             ) AS val
         ) sub
-    ) AS all_skills,
+    ) AS all_keywords,
     score_relevancy,
     explanation,
     company_name,
@@ -26,8 +25,8 @@ SELECT
     primary_type,
     city,
     country,
-    lat,
-    lon,
+    lat as latitude,   
+    lon as longitude,  
     offer_url,
     published_at,
     collected_at

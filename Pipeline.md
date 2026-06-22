@@ -1,3 +1,5 @@
+## Pipeline complete
+
 ```mermaid
 graph TB
     %% --- Entités Externes Haut ---

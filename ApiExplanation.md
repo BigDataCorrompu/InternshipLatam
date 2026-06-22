@@ -1,4 +1,4 @@
-# API Documentation — InternshipLatam
+# API Jobs Search Documentation — InternshipLatam (In French)
 
 ---
 

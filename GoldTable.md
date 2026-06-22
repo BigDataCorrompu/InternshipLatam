@@ -1,4 +1,5 @@
-# Schema Serving
+## Schema Gold (Materialized view)
+
 ```mermaid
 erDiagram
     job_offer {
