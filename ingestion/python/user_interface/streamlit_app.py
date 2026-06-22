@@ -32,48 +32,105 @@ from silver_enrichment import *
 import streamlit as st
 from groq import Groq
 
+
+query = """SELECT
+    id_offer,
+    api_source,
+    job_title,
+    contract_type,
+    is_remote,
+    offer_languages,
+    seniority,
+    (
+        SELECT jsonb_agg(DISTINCT val)
+        FROM (
+            SELECT jsonb_array_elements_text(
+                -- Utilisation de array_to_json() pour uniformiser les types en jsonb
+                COALESCE(array_to_json(skills_languages)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_frameworks)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_aptitudes)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_soft)::jsonb, '[]'::jsonb) ||
+                COALESCE(array_to_json(alternative_job_titles)::jsonb, '[]'::jsonb)
+            ) AS val
+        ) sub
+    ) AS all_skills,
+    score_relevancy,
+    explanation,
+    company_name,
+    website,
+    primary_type,
+    city,
+    country,
+    lat,
+    lon,
+    offer_url,
+    published_at,
+    collected_at
+FROM serving.job_offer;
+"""
+
+
+# ══════════════════════════════════════════════════════════════════
+# Ressources & cache (LLM, profil, README)
+# ══════════════════════════════════════════════════════════════════
 @st.cache_resource
-def get_groq_client():
-    return Groq(api_key=st.secrets["groq"]["api_key"])
+def get_llm():
+    # LLM vient de silver_enrichment ; clé depuis les secrets Streamlit
+    return LLM(groq_key=st.secrets["groq"]["api_key"])
+ 
+ 
+@st.cache_data(show_spinner=False)
+def get_profile_keywords(profile_text: str):
+    """Extraction des mots-clés du profil — mise en cache car le profil change rarement."""
+    if not (profile_text or "").strip():
+        return None
+    llm = get_llm()
+    # llama4_smart : plus conservateur (préfère null à l'hallucination)
+    return extract_profile_keywords(llm.llama4_smart, profile_text)
+ 
+ 
+@st.cache_data(show_spinner=False)
+def load_readme() -> str:
+    """Charge la doc projet (README) comme contexte pour la fonctionnalité INFO."""
+    candidates = [
+        os.path.join(dossier_parent, "README.md"),
+        os.path.join(dossier_parent, "..", "README.md"),
+        os.path.join(os.path.dirname(__file__), "README.md"),
+        os.path.join(dossier_parent, "Documentation.md"),
+        os.path.join(dossier_parent, "ProjetLatam.md"),
+    ]
+    for path in candidates:
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as fh:
+                    return fh.read()
+        except Exception:
+            continue
+    # Fallback minimal si aucun fichier trouvé
+    return (
+        "InternshipLatam — automated data pipeline that collects, enriches and scores "
+        "Data-Engineering internship/job offers in Latin America (Chile, Argentina, Uruguay). "
+        "Architecture Bronze/Silver/Gold: Airflow ingestion (JSearch, CareerJet) -> LangGraph "
+        "enrichment with Groq (company, geolocation, contacts, relevancy scoring) -> PostgreSQL "
+        "on Neon -> Streamlit dashboard. The chat supports FILTER (apply filters), MATCH (rank "
+        "offers against your profile) and INFO (answer questions about the project)."
+    )
+ 
 
-def extraire_filtres(question: str) -> dict:
-    pass
+def refresh_data_if_needed():
+    # On utilise le session_state pour que ça ne tourne qu'une fois par visiteur
+    if 'data_refreshed' not in st.session_state:
+        with st.spinner("Réveil de la base de données... un instant."):
+            try:
+                db = get_db_connection()
+                db.execute("SELECT serving.refresh_job_offer_if_stale();")
+                st.session_state['data_refreshed'] = True
+            except Exception as e:
+                st.error(f"Erreur de connexion : {e}")
 
-def appliquer_filtres(nouveaux: dict, default_filters_fn) -> None:
-    pass
+# Appel de la fonction dès le lancement
+refresh_data_if_needed()
 
-# # 1. Connexion persistante (Resource)
-# @st.cache_resource
-# def get_db_connection():
-#     # Retourne ton objet Database
-#     return Database(**st.secrets["database"])
-
-# # 2. Chargement des données (Data)
-# @st.cache_data(ttl=3600) # ttl=3600 recharge les données toutes les heures
-# def load_data(query: str):
-#     db = get_db_connection() # On appelle la connexion ici
-#     data = db.execute(query)
-#     return pd.DataFrame(data)
-     
-
-# def refresh_data_if_needed():
-#     # On utilise le session_state pour que ça ne tourne qu'une fois par visiteur
-#     if 'data_refreshed' not in st.session_state:
-#         with st.spinner("Réveil de la base de données... un instant."):
-#             try:
-#                 db = get_db_connection()
-#                 db.execute("SELECT serving.refresh_job_offer_if_stale();")
-#                 st.session_state['data_refreshed'] = True
-#             except Exception as e:
-#                 st.error(f"Erreur de connexion : {e}")
-
-# # Appel de la fonction dès le lancement
-# refresh_data_if_needed()
-
-
-# # Utilisation
-# query = "SELECT * FROM raw.job_offer LIMIT 5;"
-# df = load_data(query)
 
 # st.dataframe(df)
 df = pd.DataFrame(fake_job_offers)

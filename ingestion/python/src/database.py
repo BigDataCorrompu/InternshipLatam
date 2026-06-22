@@ -78,15 +78,23 @@ class Database:
             table:str, 
             columns: list[str], 
             data: list[tuple[Any]], 
-            batch_size: int=500, 
+            batch_size: int=200, 
             onConflict: Literal["update", "nothing"] | None = None,
-            conflict_columns: list[str] = None
-            ) -> None:
+            conflict_columns: list[str] = None,
+            returning: list[str] | None = None  # nouveau paramètre
+            ) -> list[dict] | None:
         total = len(data) # Total of lines to insert
         inserted = 0 
+        all_returned_rows = []
 
         conflict_clause = self._build_conflict_clause(onConflict, conflict_columns, columns) 
         cols = ", ".join(f'"{c}"' for c in columns) # Generate columns name keeping the upper case 
+
+        returning_clause = ""
+        if returning:
+            returning_cols = ", ".join(f'"{c}"' for c in returning)
+            returning_clause = f" RETURNING {returning_cols}"
+
 
         for i in range(0, total, batch_size): # Run from first to last with batch_size step
             chunk = data[i:i + batch_size] # chunk from i to i+batch_size
@@ -102,19 +110,25 @@ class Database:
             else:
                 table_sql = f'"{table}"'
 
-            query = f'INSERT INTO {table_sql} ({cols}) VALUES {rows_placeholders} {conflict_clause};'
+            query = f'INSERT INTO {table_sql} ({cols}) VALUES {rows_placeholders} {conflict_clause}{returning_clause};'
+
 
             print(f"Query : {query}")
 
             # Aplatit toutes les valeurs en une seule liste
             params = [None if v is None else v for row in chunk for v in row]
             
-            self.execute(query, params)  #  params passés séparément, jamais dans la string
+            result = self.execute(query, params)  #  params passés séparément, jamais dans la string
+
+            if returning and result:
+                all_returned_rows.extend(result)
             
             inserted += len(chunk)
             log.info(f"✅ Batch {i // batch_size + 1} OK ({inserted}/{total} lignes)")
 
         log.info(f"✅ Bulk insert terminé ({total} lignes en {-(-total // batch_size)} requêtes)")
+
+        return all_returned_rows if returning else None
 
 
     def _build_conflict_clause(self, on_conflict, conflict_columns, columns) -> str:

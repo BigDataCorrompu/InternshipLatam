@@ -88,7 +88,8 @@ LEFT JOIN LATERAL (
             ORDER BY confidence DESC
         ) AS company_mails
     FROM analytics.company_contact
-    WHERE id_location = jo.id_location
+    -- On joint sur l'entreprise, c'est plus robuste que sur la localisation
+    WHERE id_company = jo.id_company 
 ) cc ON TRUE;
 
 CREATE UNIQUE INDEX idx_serving_job_offer_id ON serving.job_offer(id_offer);

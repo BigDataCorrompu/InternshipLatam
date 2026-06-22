@@ -35,4 +35,77 @@ def load_json(filepath: str, filename: str) -> dict:
     json_text = path.read_text(encoding='utf-8')
     logger.info(f"[READ] file={filename} status=success")
     return json.loads(json_text)
+
+
+def normalise_list_language(liste_brute):
+    """
+    Normalise spanish, espanol in es
+    And ignore what is not a language like C++
+    """
+    # Liste officielle de TOUS les codes ISO 639-1 valides sur Terre (2 lettres)
+    # Permet de bloquer instantanément les faux positifs informatiques (ex: SQL -> sq)
+    ISO_639_1_OFFICIEL = {
+        "aa", "ab", "ae", "af", "ak", "am", "an", "ar", "as", "av", "ay", "az",
+        "ba", "be", "bg", "bi", "bm", "bn", "bo", "br", "bs", "ca", "ce", "ch",
+        "co", "cr", "cs", "cu", "cv", "cy", "da", "de", "dv", "dz", "ee", "el",
+        "en", "eo", "es", "et", "eu", "fa", "ff", "fi", "fj", "fo", "fr", "fy",
+        "ga", "gd", "gl", "gn", "gu", "gv", "ha", "he", "hi", "ho", "hr", "ht",
+        "hu", "hy", "hz", "ia", "id", "ie", "ig", "ii", "ik", "io", "is", "it",
+        "iu", "ja", "jv", "ka", "kg", "ki", "kj", "kk", "kl", "km", "kn", "ko",
+        "kr", "ks", "kv", "kw", "ky", "la", "lb", "lg", "li", "ln", "lo", "lt",
+        "lu", "lv", "mg", "mh", "mi", "mk", "ml", "mn", "mr", "ms", "mt", "my",
+        "na", "nb", "nd", "ne", "ng", "nl", "nn", "no", "nr", "nv", "ny", "oc",
+        "oj", "om", "or", "os", "pa", "pi", "pl", "ps", "pt", "qu", "rm", "rn",
+        "ro", "ru", "rw", "sa", "sc", "sd", "se", "sg", "si", "sk", "sl", "sm",
+        "sn", "so", "sq", "sr", "ss", "st", "su", "sv", "sw", "ta", "te", "tg",
+        "th", "ti", "tk", "tl", "tn", "to", "tr", "ts", "tt", "tw", "ty", "ug",
+        "uk", "ur", "uz", "ve", "vi", "vo", "wa", "wo", "xh", "yi", "yo", "za",
+        "zh", "zu"
+    }
+
+    def normalise_word(texte):
+        # 1. Nettoyage strict
+        txt = str(texte).strip().lower()
+        
+        # 2. Élimination des valeurs inconnues ou trop courtes (C, C++, etc.)
+        if txt in ["unknown", "none", "null", ""] or len(txt) < 2:
+            return None
+            
+        # Exception manuelle pour bloquer les rares technos qui imitent des codes valides
+        # ex: Python -> py (langue officielle féroïen), .NET -> ne (langue officielle népalais)
+        if txt in ["python", ".net", "dotnet", "java", "sql"]:
+            return None
+
+        # 3. Si c'est déjà un code ISO valide à 2 lettres (ex: "es", "en")
+        if len(txt) == 2 and txt in ISO_639_1_OFFICIEL:
+            return txt
+            
+        # 4. Extraction des 2 premières lettres pour les mots longs
+        code_graine = txt[:2]
+        
+        # Correction automatique pour les racines spécifiques
+        if code_graine == "sp": 
+            return "es"
+        if code_graine == "po": 
+            return "pt"
+        if code_graine == "ge":
+            return "de"
+            
+        # Sécurité : On valide que la racine extraite est une VRAIE langue humaine
+        # Bloque définitivement SQL (sq), .NET (ne), HTML (ht), etc.
+        if code_graine in ISO_639_1_OFFICIEL:
+            return code_graine
+
+        return None
+
+    # Si l'entrée est du texte au lieu d'une liste (ex: "espanol, sql")
+    if isinstance(liste_brute, str):
+        liste_brute = [lang.strip() for lang in liste_brute.replace(",", " ").split()]
+    elif not isinstance(liste_brute, list):
+        return []
+
+    # Application de la logique sur chaque élément de la liste
+    resultat_clean = [normalise_word(item) for item in liste_brute]
     
+    # Suppression des valeurs None et des doublons, puis conversion en liste
+    return list(set(code for code in resultat_clean if code is not None))

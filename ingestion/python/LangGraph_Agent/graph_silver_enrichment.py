@@ -98,13 +98,14 @@ class OfferAttribute(BaseModel):
             "Find it strictly from the text or use 'unknown' if not clearly stated."
         )
     )
-    offer_language: list[str] = Field(
+    spoken_languages_required: list[str] = Field(
         description=(
-            "Detect the language required for this job offer."
-            "If no languages is mentionned detect the language in which this job offer is written."
-            "Infer from the description content, not from English tech keywords in the title. "
-            "Many languages can be precised like english and spanish"
-            "Return it STRICTLY with the Norme ISO 639-1 (ex: es, en, fr, pt)"
+            "Detect the speaking language required for this job offer."
+            "Strictly identify the human language required to speak/work in the position."
+            "EXCLUDE languages that are only used as 'tech keywords' (e.g., if a job is in Spanish but mentions 'English documentation', do NOT add 'en')."
+            "If the job description is written in one language and no other is required, return only the language of the description."
+            "CRITICAL: Return ONLY the ISO 639-1 codes (e.g., ['es'], ['fr'], ['pt']). Do NOT return the full language names."
+            "If you are unsure, default to the language of the offer text itself."
         )
     )
     @field_validator("is_remote", mode="before")

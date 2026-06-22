@@ -12,10 +12,12 @@ DROP TABLE IF EXISTS analytics.company CASCADE;
 
 CREATE TABLE analytics.company (
     id_company      SERIAL          PRIMARY KEY,
-    company_name    VARCHAR(150)    NOT NULL,   -- nom normalisé par LLM
+    company_name    VARCHAR(150)    NOT NULL,
     website         VARCHAR(200),
-    primary_type    VARCHAR(100),                -- secteur / type d'activité (Google Places)
-    collected_at    TIMESTAMPTZ     DEFAULT NOW()
+    primary_type    VARCHAR(100),
+    collected_at    TIMESTAMPTZ     DEFAULT NOW(),
+
+    UNIQUE (company_name)              -- ajouté : nécessaire pour ON CONFLICT (company_name)
 );
 
 -- ============================================================
@@ -32,11 +34,11 @@ CREATE TABLE analytics.company_location (
     lat             FLOAT,
     lon             FLOAT,
     phone           VARCHAR(50),
-    business_status VARCHAR(50),                -- "OPERATIONAL" | "CLOSED" (Google Places)
-    source          VARCHAR(50),                 -- "google_places" | "llm"
+    business_status VARCHAR(50),
+    source          VARCHAR(50),
     collected_at    TIMESTAMPTZ     DEFAULT NOW(),
 
-    UNIQUE (id_company, city, country)           -- une seule filiale par ville/pays
+    UNIQUE (id_company, city, country)
 );
 
 -- ============================================================
@@ -49,10 +51,12 @@ CREATE TABLE analytics.company_contact (
     id_company      INT             NOT NULL REFERENCES analytics.company(id_company),
     id_location     INT             REFERENCES analytics.company_location(id_location),
     email           VARCHAR(254)    NOT NULL,
-    confidence      FLOAT,                       -- score 0-1
+    confidence      FLOAT,
     explanation     TEXT,
-    source          VARCHAR(50),                 -- "hunter.io" | "llm" | "ddgs"
-    collected_at    TIMESTAMPTZ     DEFAULT NOW()
+    source          VARCHAR(50),
+    collected_at    TIMESTAMPTZ     DEFAULT NOW(),
+
+    UNIQUE (email)                      -- ajouté : nécessaire pour ON CONFLICT (email)
 );
 
 -- ============================================================
@@ -61,7 +65,7 @@ CREATE TABLE analytics.company_contact (
 DROP TABLE IF EXISTS analytics.job_offer CASCADE;
 
 CREATE TABLE analytics.job_offer (
-    id_offer            VARCHAR(50)     PRIMARY KEY,   -- = raw.id_job
+    id_offer            VARCHAR(50)     PRIMARY KEY,   -- PK = déjà UNIQUE nativement
     id_company          INT             REFERENCES analytics.company(id_company),
     id_location         INT             REFERENCES analytics.company_location(id_location),
     api_source          VARCHAR(15)     NOT NULL,
@@ -70,14 +74,13 @@ CREATE TABLE analytics.job_offer (
     contract_type       VARCHAR(20),
     is_remote           BOOLEAN,
     job_publisher       VARCHAR(100),
-    location_raw        VARCHAR(100),               -- valeur brute conservée pour audit
+    location_raw        VARCHAR(100),
     offer_url           VARCHAR(500)    NOT NULL,
     source_platform     VARCHAR(100),
-    offer_language       VARCHAR(10),                 -- langue de rédaction de l'offre
     published_at        TIMESTAMPTZ,
     collected_at         TIMESTAMPTZ     DEFAULT NOW(),
 
-    UNIQUE (offer_url)                              -- déduplication cross-collecte
+    UNIQUE (offer_url)
 );
 
 -- ============================================================
@@ -89,14 +92,16 @@ CREATE TABLE analytics.job_requirement (
     id              SERIAL          PRIMARY KEY,
     id_offer        VARCHAR(50)     NOT NULL REFERENCES analytics.job_offer(id_offer),
     alternative_job_titles  TEXT[],
-    offer_languages         TEXT[],              -- langues humaines requises par le poste
-    seniority               VARCHAR(20),         -- "junior" | "mid" | "senior"
-    skills_languages        TEXT[],              -- Python, SQL, Java...
-    skills_frameworks       TEXT[],              -- Airflow, dbt, AWS...
-    skills_aptitudes        TEXT[],              -- Administration BDD, Architecture...
-    skills_soft             TEXT[],              -- Autonomie, Travail en équipe...
+    offer_languages         TEXT[],
+    seniority               VARCHAR(20),
+    skills_languages        TEXT[],
+    skills_frameworks       TEXT[],
+    skills_aptitudes        TEXT[],
+    skills_soft             TEXT[],
     prompt_version          VARCHAR(50),
-    collected_at             TIMESTAMPTZ     DEFAULT NOW()
+    collected_at             TIMESTAMPTZ     DEFAULT NOW(),
+
+    UNIQUE (id_offer)                   -- ajouté : nécessaire pour ON CONFLICT (id_offer)
 );
 
 -- ============================================================
@@ -107,7 +112,9 @@ DROP TABLE IF EXISTS analytics.prompt_relevancy CASCADE;
 CREATE TABLE analytics.prompt_relevancy (
     id_prompt       SERIAL          PRIMARY KEY,
     prompt          TEXT            NOT NULL,
-    created_at      TIMESTAMPTZ     DEFAULT NOW()
+    created_at      TIMESTAMPTZ     DEFAULT NOW(),
+
+    UNIQUE (prompt)                     -- ajouté : nécessaire pour ON CONFLICT (prompt)
 );
 
 -- ============================================================
@@ -119,7 +126,7 @@ CREATE TABLE analytics.job_relevancy (
     id              SERIAL          PRIMARY KEY,
     id_offer        VARCHAR(50)     NOT NULL REFERENCES analytics.job_offer(id_offer),
     id_prompt       INT             REFERENCES analytics.prompt_relevancy(id_prompt),
-    score_relevancy FLOAT,                       -- score global (calculé ou fourni par le LLM)
+    score_relevancy FLOAT,
     score_job       FLOAT,
     score_skills    FLOAT,
     score_location  FLOAT,
@@ -128,7 +135,9 @@ CREATE TABLE analytics.job_relevancy (
     score_work_mode FLOAT,
     score_company   FLOAT,
     explanation     TEXT,
-    collected_at    TIMESTAMPTZ     DEFAULT NOW()
+    collected_at    TIMESTAMPTZ     DEFAULT NOW(),
+
+    UNIQUE (id_offer)                   -- ajouté : nécessaire pour ON CONFLICT (id_offer)
 );
 
 -- ============================================================

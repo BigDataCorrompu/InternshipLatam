@@ -146,7 +146,7 @@ def map_bronze_to_JobOfferState(row: dict) -> JobOfferState:
         "location_raw": row["location_raw"],
         "offer_url": row["offer_url"],
         "source_platform": row["source_platform"],
-        "offer_language": None,
+        "spoken_languages_required": None,
         "published_at": row["published_at"],
         "collected_at": row["collected_at"],
 

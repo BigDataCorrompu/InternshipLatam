@@ -2,19 +2,26 @@ SELECT
     id_offer,
     api_source,
     job_title,
-    offer_description,
     contract_type,
     is_remote,
-    alternative_job_titles,
     offer_languages,
     seniority,
-    skills_languages,
-    skills_frameworks,
-    skills_aptitudes,
-    skills_soft,
+    (
+        SELECT jsonb_agg(DISTINCT val)
+        FROM (
+            SELECT jsonb_array_elements_text(
+                -- Utilisation de array_to_json() pour uniformiser les types en jsonb
+                COALESCE(array_to_json(skills_languages)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_frameworks)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_aptitudes)::jsonb, '[]'::jsonb) || 
+                COALESCE(array_to_json(skills_soft)::jsonb, '[]'::jsonb) ||
+                COALESCE(array_to_json(alternative_job_titles)::jsonb, '[]'::jsonb)
+            ) AS val
+        ) sub
+    ) AS all_skills,
     score_relevancy,
-    explanations,
-    company,
+    explanation,
+    company_name,
     website,
     primary_type,
     city,
@@ -24,4 +31,4 @@ SELECT
     offer_url,
     published_at,
     collected_at
-FROM serving.job_offer
+FROM serving.job_offer;
