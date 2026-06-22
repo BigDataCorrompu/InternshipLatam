@@ -15,7 +15,7 @@ class CompanyOutput(BaseModel):
         description="Name of the company recruiting for this offer, mentioned in the text. Do not invent or mistake a software/tool name for the company name. Return null if not found."
     )
 extract_company = Extract(
-    llm=llm.llama4_smart,
+    llm=llm.enrichement,
     task=(
         "Find the name of the company recruiting for this job offer, based on the title and description. "
         "The name must be explicitly mentioned in the text — do not invent it or mistake a software/tool name for it."
@@ -33,7 +33,7 @@ class LocationRawOutput(BaseModel):
         "If you find nothing additional, just return the existing location_raw unchanged.")
     )
 extract_location = Extract(
-    llm=llm.llama4_smart,
+    llm=llm.enrichement,
     task=(
         "I need a location hint to start a Google Maps API query. I don't need a precise location, "
         "just something that indicates where the company is located. "
@@ -116,7 +116,7 @@ class OfferAttribute(BaseModel):
         return v
 
 extract_attributes = Extract(
-    llm=llm.llama4_smart,
+    llm=llm.enrichement,
     task=(
         'Find the seniority needed for this job offer or deduct it. '
         'Find if the offer is in remote strictly from the text. '
@@ -155,7 +155,7 @@ class OfferSkills(BaseModel):
 
 
 extract_skills = Extract(
-    llm=llm.llama4_smart,
+    llm=llm.enrichement,
     task=(
         "Extract the required skills needed for this offer. "
         "You can deduce it if it is implied but do not invent anything. "
@@ -177,7 +177,7 @@ Je veux developper mes connaissance en cloud data engineering nottament AWS et l
 Je parle français C2, anglais B2, espagnol débutant A2.
 Je veux faire un stage a temps plein sur le lieux de l'ebtreprise, le remote hybride ne me derange pas
 """
-determine_relevancy = DetermineRelevancy(llm=llm.llama4_smart, profile=profile)
+determine_relevancy = DetermineRelevancy(llm=llm.enrichement, profile=profile)
 
 calculate_relevancy = partial(calculate_total_score, weights=WEIGHTS)
 

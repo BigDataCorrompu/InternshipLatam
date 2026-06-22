@@ -61,11 +61,11 @@ WEIGHTS = {
 class LLM:
     def __init__(self, groq_key: str=None):
         self._groq_key = groq_key or os.getenv("GROQ_APP_KEY")
-        self.llama3_smart = ChatOllama(model="llama3.2", temperature=0)
-        self.llama4_smart = ChatOllama(model="llama3.2", temperature=0)
+        # Need to pay if groq
+        self.enrichement = ChatOllama(model="llama3.2", temperature=0)
 
-        # self.llama3_smart = ChatGroq(model="llama-3.3-70b-versatile", api_key=self._groq_key, temperature=0)
-        # self.llama4_smart = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self._groq_key, temperature=0)
+        self.llama3_smart = ChatGroq(model="llama-3.3-70b-versatile", api_key=self._groq_key, temperature=0)
+        self.llama4_smart = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self._groq_key, temperature=0)
 
         # Problem of formatting with this model use an another one
         # self.llm_fast  = ChatGroq(model="llama-3.1-8b-instant", api_key=self._groq_key, temperature=0)
@@ -339,7 +339,7 @@ class EmailResults(BaseModel):
 class FindMails:
     def __init__(self, llm):
         self._generate_query = Extract(
-            llm=llm.llama3_smart, 
+            llm=llm.enrichement, 
             # task=(
             #     "Generate a SHORT and FOCUSED search query (max 4-5 words) to find an HR or recruitment contact email "
             #     "for this company. "
@@ -360,7 +360,7 @@ class FindMails:
             schema=SearchQueryOutput,
             fields=["company_name", "city", "country"]
         )
-        self._llm_structured = llm.llama4_smart.with_structured_output(EmailResults)
+        self._llm_structured = llm.enrichement.with_structured_output(EmailResults)
     
     def __call__(self, state: JobOfferState) -> dict:
         company = state.get("company_name")
