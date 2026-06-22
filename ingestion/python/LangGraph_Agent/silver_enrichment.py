@@ -8,7 +8,7 @@ from rapidfuzz import fuzz, process
 from pydantic import BaseModel, field_validator, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_groq import ChatGroq
-from langchain_ollama import ChatOllama
+# from langchain_ollama import ChatOllama
 from dotenv import load_dotenv
 import operator
 from typing import Annotated
@@ -62,13 +62,20 @@ class LLM:
     def __init__(self, groq_key: str=None):
         self._groq_key = groq_key or os.getenv("GROQ_APP_KEY")
         # Need to pay if groq
-        self.enrichement = ChatOllama(model="llama3.2", temperature=0)
+        self.enrichement = None
 
         self.llama3_smart = ChatGroq(model="llama-3.3-70b-versatile", api_key=self._groq_key, temperature=0)
         self.llama4_smart = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self._groq_key, temperature=0)
-
         # Problem of formatting with this model use an another one
         # self.llm_fast  = ChatGroq(model="llama-3.1-8b-instant", api_key=self._groq_key, temperature=0)
+    
+    @property
+    def enrichement(self):
+        """Only import Ollama if the key is requiered"""
+        if self.enrichement is None:
+            from langchain_ollama import ChatOllama
+            self._enrichement = ChatOllama(model="llama3.2", temperature=0)
+        return self._enrichement
 
         
 # =========================== STATE ===========================
