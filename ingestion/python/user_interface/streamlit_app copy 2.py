@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px          # ⚠️ corrigé : était `import plotly as px` (cassait scatter_mapbox/pie/bar)
+import plotly.express as px   
 # from fake_offer import fake_job_offers
 
 import time
@@ -26,7 +26,12 @@ for dossier in [dossier_parent, dossier_agent, dossier_src, dossier_ui]:
 # 4. Importations des modules locaux
 from database import Database
 from silver_enrichment import *
-from langchain_core.messages import HumanMessage
+from dashboard_agent import (
+    SETTINGS,
+    extract_profile_keywords,
+    resolve_id_column,
+    run_agent,
+)
 
 
 
@@ -45,6 +50,42 @@ def get_llm():
     return LLM(groq_key=st.secrets["groq"]["api_key"])
 
 
+@st.cache_data(show_spinner=False)
+def get_profile_keywords(profile_text: str):
+    """Extraction des mots-clés du profil — mise en cache car le profil change rarement."""
+    if not (profile_text or "").strip():
+        return None
+    llm = get_llm()
+    # llama4_smart : plus conservateur (préfère null à l'hallucination)
+    return extract_profile_keywords(llm.llama4_smart, profile_text)
+
+
+@st.cache_data(show_spinner=False)
+def load_readme() -> str:
+    """Charge la doc projet (README) comme contexte pour la fonctionnalité INFO."""
+    candidates = [
+        os.path.join(dossier_parent, "README.md"),
+        os.path.join(dossier_parent, "..", "README.md"),
+        os.path.join(os.path.dirname(__file__), "README.md"),
+        os.path.join(dossier_parent, "Documentation.md"),
+        os.path.join(dossier_parent, "ProjetLatam.md"),
+    ]
+    for path in candidates:
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as fh:
+                    return fh.read()
+        except Exception:
+            continue
+    # Fallback minimal si aucun fichier trouvé
+    return (
+        "InternshipLatam — automated data pipeline that collects, enriches and scores "
+        "Data-Engineering internship/job offers in Latin America (Chile, Argentina, Uruguay). "
+        "Architecture Bronze/Silver/Gold: Airflow ingestion (JSearch, CareerJet) -> LangGraph "
+        "enrichment with Groq (company, geolocation, contacts, relevancy scoring) -> PostgreSQL "
+        "on Neon -> Streamlit dashboard. The chat supports FILTER (apply filters), MATCH (rank "
+        "offers against your profile) and INFO (answer questions about the project)."
+    )
 @st.cache_data(ttl=600, show_spinner="Fetching real data from database...")
 def load_real_offers():
     # Connects automatically using [connections.postgresql] from secrets.toml
@@ -213,7 +254,8 @@ def default_filters() -> dict:
         "seniorities": list(ALL_SENIORITIES),   # all checked by default (intentional)
         "remote":      None,                     # None = "All" (no filter)
         "max_days":    30,
-        "companies":   [],
+        "companies":   [],                        # pas de widget, piloté par le chat (décision #5)
+        # `top_n` retiré : config morte, déplacé en interne du MATCH (SETTINGS.fuzzy_pool_size — décision #6)
     }
 
 if "filters" not in st.session_state:
@@ -278,7 +320,21 @@ with st.sidebar:
     if st.button("♻️ Reset filters"):
         st.session_state["filters"] = default_filters()
         st.session_state["_filters_dirty"] = True
+        st.session_state.pop("match_results", None)
+        st.session_state.pop("match_offer_ids", None)
         st.rerun()
+
+    st.checkbox("🤖 Try AI agent", value=False, key="w_use_agent")
+
+    # ── Profil utilisateur (utilisé par la fonctionnalité MATCH) ──
+    with st.expander("🧑 Your profile (for matching)"):
+        st.text_area(
+            "Describe your skills, target role, languages…",
+            key="user_profile",
+            placeholder="e.g. Junior Data Engineer. Python, SQL, Airflow, Docker, LangGraph. "
+                        "Looking for a data engineering internship in Latin America. English C1, French native.",
+            height=160,
+        )
 
     st.divider()
     st.write("Dashboard developed by X")
@@ -408,38 +464,104 @@ st.caption(f"**{len(filtered_df)}** offers match the filters (out of {len(df)}).
 
 
 # ══════════════════════════════════════════════════════════════════
-# Offers table
+# Offers table — surligne les offres matchées par le chat (décision #4)
 # ══════════════════════════════════════════════════════════════════
 def render_offers_table(d: pd.DataFrame) -> None:
     if d.empty:
         return
+    matched = set(st.session_state.get("match_offer_ids", []))
+
+    disp = d.copy()
+    id_col = resolve_id_column(disp)
+    disp["_offer_id"] = disp[id_col].astype(str) if id_col else disp.index.astype(str)
+
     show_cols = [c for c in ["job_title", "company_name", "city", "country",
-                             "seniority", "is_remote", "score_relevancy"] if c in d.columns]
+                             "seniority", "is_remote", "score_relevancy"] if c in disp.columns]
+    view = disp[show_cols + ["_offer_id"]]
+
+    def _row_style(r):
+        on = r["_offer_id"] in matched
+        css = "background-color:#264653; color:white" if on else ""
+        return [css for _ in r.index]
+
     st.subheader("📋 Offers")
-    st.dataframe(d[show_cols], hide_index=True, use_container_width=True)
+    if matched:
+        st.caption("Rows highlighted in green were matched to your profile by the assistant.")
+    styler = view.style.apply(_row_style, axis=1)
+    st.dataframe(styler, hide_index=True, use_container_width=True, column_order=show_cols)
 
 
 render_offers_table(filtered_df)
 
 
 # ══════════════════════════════════════════════════════════════════
-# 💬 Chatbot — simple, sans contexte
+# Match results — tableau détaillé renvoyé par la fonctionnalité MATCH
 # ══════════════════════════════════════════════════════════════════
-st.divider()
-st.subheader("💬 Chatbot")
+if st.session_state.get("match_results") is not None:
+    mt = st.session_state["match_results"]
+    if not mt.empty:
+        st.subheader("🎯 Offers matching your profile")
+        nice = mt.copy()
+        nice["matched"] = nice["matched"].apply(
+            lambda v: ", ".join(v) if isinstance(v, list) else ""
+        )
+        nice = nice.rename(columns={
+            "job_title": "Title",
+            "company_name": "Company",
+            "matched": "Matched keywords",
+            "coverage": "Keywords matched",
+        })[["Title", "Company", "Matched keywords", "Keywords matched"]]
+        st.dataframe(nice, hide_index=True, use_container_width=True)
 
-if "chat_history" not in st.session_state:
-    st.session_state["chat_history"] = []
 
-for role, content in st.session_state["chat_history"]:
-    with st.chat_message(role):
-        st.markdown(content)
-
-prompt = st.chat_input("Ask me anything…")
-if prompt:
-    st.session_state["chat_history"].append(("user", prompt))
+# ══════════════════════════════════════════════════════════════════
+# 💬 Assistant (FILTER / MATCH / INFO) — visible si la case est cochée
+# ══════════════════════════════════════════════════════════════════
+def handle_user_message(prompt: str) -> None:
+    """Appelle l'agent (pur) et applique ici les effets de bord (filtres, match, message)."""
     llm = get_llm()
-    with st.spinner("Thinking…"):
-        resp = llm.llama3_smart.invoke([HumanMessage(content=prompt)])
-    st.session_state["chat_history"].append(("assistant", resp.content))
-    st.rerun()
+    pk = get_profile_keywords(st.session_state.get("user_profile", ""))
+
+    result = run_agent(
+        llm=llm,
+        message=prompt,
+        df=df,
+        user_profile=st.session_state.get("user_profile", ""),
+        current_filters=st.session_state["filters"],
+        readme_text=load_readme(),
+        apply_filters_fn=apply_filters,
+        default_filters_fn=default_filters,
+        profile_keywords=pk,
+        settings=SETTINGS,
+    )
+
+    # FILTER -> merge dans la source de vérité + resync sidebar au prochain run
+    if result.new_filters:
+        st.session_state["filters"].update(result.new_filters)
+        st.session_state["_filters_dirty"] = True
+
+    # MATCH -> stocke résultats + ids pour le surlignage
+    if result.match_table is not None:
+        st.session_state["match_results"] = result.match_table
+        st.session_state["match_offer_ids"] = result.response.offer_ids
+
+    st.session_state["chat_history"].append(("assistant", result.response.message))
+
+
+if st.session_state.get("w_use_agent"):
+    st.divider()
+    st.subheader("💬 Assistant")
+
+    if "chat_history" not in st.session_state:
+        st.session_state["chat_history"] = []
+
+    for role, content in st.session_state["chat_history"]:
+        with st.chat_message(role):
+            st.markdown(content)
+
+    prompt = st.chat_input("Filter offers, match your profile, or ask about the project…")
+    if prompt:
+        st.session_state["chat_history"].append(("user", prompt))
+        with st.spinner("Thinking…"):
+            handle_user_message(prompt)
+        st.rerun()

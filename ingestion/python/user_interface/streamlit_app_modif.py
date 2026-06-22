@@ -1,105 +1,100 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly as px
-from fake_offer import fake_job_offers 
+import plotly.express as px          # ⚠️ corrigé : était `import plotly as px` (cassait scatter_mapbox/pie/bar)
+# from fake_offer import fake_job_offers
 
 import time
-import sys
 import os
+import sys
 
+# 1. Récupère le chemin absolu du dossier 'python' (parent commun)
+# __file__ est dans user_interface/, son parent ('..') est python/
+dossier_parent = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-# 1. Récupère le chemin du dossier parent commun
-dossier_parent = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# 2. Construit les chemins vers les dossiers contenant vos modules
+# Note : 'database' est généralement dans 'user_interface' ou à la racine de 'python'
+dossier_agent = os.path.join(dossier_parent, "LangGraph_Agent")
+dossier_src = os.path.join(dossier_parent, "src")
+dossier_ui = os.path.join(dossier_parent, "user_interface")
 
-# 2. Construit le chemin pour le premier dossier voisin
-voisin_1 = os.path.join(dossier_parent, 'src')
-
-# 3. Construit le chemin pour le deuxième dossier voisin
-voisin_2 = os.path.join(dossier_parent, 'LangGraph_Agent')
-
-# 4. Ajoute les deux dossiers au système de recherche de Python
-for dossier in [voisin_1, voisin_2]:
+# 3. Ajoute les dossiers au système de recherche de Python s'ils n'y sont pas
+for dossier in [dossier_parent, dossier_agent, dossier_src, dossier_ui]:
     if dossier not in sys.path:
         sys.path.append(dossier)
 
-# 5. Importe vos fichiers respectifs 
+# 4. Importations des modules locaux
 from database import Database
 from silver_enrichment import *
+from langchain_core.messages import HumanMessage
 
 
-# agent.py
-import streamlit as st
-from groq import Groq
 
-
-query = """SELECT
-    id_offer,
-    api_source,
-    job_title,
-    contract_type,
-    is_remote,
-    offer_languages,
-    seniority,
-    (
-        SELECT jsonb_agg(DISTINCT val)
-        FROM (
-            SELECT jsonb_array_elements_text(
-                -- Utilisation de array_to_json() pour uniformiser les types en jsonb
-                COALESCE(array_to_json(skills_languages)::jsonb, '[]'::jsonb) || 
-                COALESCE(array_to_json(skills_frameworks)::jsonb, '[]'::jsonb) || 
-                COALESCE(array_to_json(skills_aptitudes)::jsonb, '[]'::jsonb) || 
-                COALESCE(array_to_json(skills_soft)::jsonb, '[]'::jsonb) ||
-                COALESCE(array_to_json(alternative_job_titles)::jsonb, '[]'::jsonb)
-            ) AS val
-        ) sub
-    ) AS all_skills,
-    score_relevancy,
-    explanation,
-    company_name,
-    website,
-    primary_type,
-    city,
-    country,
-    lat,
-    lon,
-    offer_url,
-    published_at,
-    collected_at
-FROM serving.job_offer;
-"""
-
+# ══════════════════════════════════════════════════════════════════
+# Ressources & cache (LLM, profil, README)
+# ══════════════════════════════════════════════════════════════════
 # # 1. Connexion persistante (Resource)
 @st.cache_resource
 def get_db_connection():
     # Retourne ton objet Database
     return Database(**st.secrets["database"])
 
-# # 2. Chargement des données (Data)
-@st.cache_data(ttl=3600) # ttl=3600 recharge les données toutes les heures
-def load_data(query: str):
-    db = get_db_connection() # On appelle la connexion ici
-    data = db.execute(query)
-    return pd.DataFrame(data)
-     
-
-def refresh_data_if_needed():
-    # On utilise le session_state pour que ça ne tourne qu'une fois par visiteur
-    if 'data_refreshed' not in st.session_state:
-        with st.spinner("Réveil de la base de données... un instant."):
-            try:
-                db = get_db_connection()
-                db.execute("SELECT serving.refresh_job_offer_if_stale();")
-                st.session_state['data_refreshed'] = True
-            except Exception as e:
-                st.error(f"Erreur de connexion : {e}")
-
-# Appel de la fonction dès le lancement
-refresh_data_if_needed()
+@st.cache_resource
+def get_llm():
+    # LLM vient de silver_enrichment ; clé depuis les secrets Streamlit
+    return LLM(groq_key=st.secrets["groq"]["api_key"])
 
 
-# st.dataframe(df)
-df = pd.DataFrame(fake_job_offers)
+@st.cache_data(ttl=600, show_spinner="Fetching real data from database...")
+def load_real_offers():
+    # Connects automatically using [connections.postgresql] from secrets.toml
+    db = get_db_connection()
+    
+    query = """
+    SELECT
+        id_offer as job_id,
+        api_source,
+        job_title,
+        contract_type,
+        is_remote,
+        offer_languages,
+        seniority,
+        (
+            SELECT jsonb_agg(DISTINCT val)
+            FROM (
+                SELECT jsonb_array_elements_text(
+                    COALESCE(array_to_json(skills_languages)::jsonb, '[]'::jsonb) || 
+                    COALESCE(array_to_json(skills_frameworks)::jsonb, '[]'::jsonb) || 
+                    COALESCE(array_to_json(skills_aptitudes)::jsonb, '[]'::jsonb) || 
+                    COALESCE(array_to_json(skills_soft)::jsonb, '[]'::jsonb) ||
+                    COALESCE(array_to_json(alternative_job_titles)::jsonb, '[]'::jsonb)
+                ) AS val
+            ) sub
+        ) AS all_skills,
+        score_relevancy,
+        explanation,
+        company_name,
+        website,
+        primary_type,
+        city,
+        country,
+        lat as latitude,   -- Aliased for Plotly map compatibility
+        lon as longitude,  -- Aliased for Plotly map compatibility
+        offer_url,
+        published_at,
+        collected_at
+    FROM serving.job_offer;
+    """
+    db.execute('SELECT serving.refresh_job_offer_if_stale();')
+    return db.execute(query)
+
+
+
+# ══════════════════════════════════════════════════════════════════
+# Données (fake data en dev)
+# ══════════════════════════════════════════════════════════════════
+# Load the real dataframe
+df = pd.DataFrame(load_real_offers())
 
 st.set_page_config(page_title="AI Job Offer Dashboard Latam", page_icon="🏙️", layout="wide")
 st.title("🏙️ AI Job Offer Dashboard Latam")
@@ -110,6 +105,10 @@ st.title("🏙️ AI Job Offer Dashboard Latam")
 df["is_remote"] = df["is_remote"].fillna(False)
 df["country"] = df["country"].fillna("Not specified")
 df["company_name"] = df["company_name"].fillna("unknown")
+
+if "collected_at" in df.columns:
+    df["collected_at"] = pd.to_datetime(df["collected_at"])
+
 
 # ══════════════════════════════════════════════════════════════════
 # Lists for widgets
@@ -182,12 +181,19 @@ def apply_filters(df: pd.DataFrame, f: dict) -> pd.DataFrame:
         out = out[out["offer_languages"].apply(lambda langs: any(l in langs for l in f["languages"]))]
     if f["seniorities"]:
         out = out[out["seniority"].isin(f["seniorities"])]
+    if f.get("companies"):                       # ➕ décision #5 : on lit enfin le filtre companies
+        out = out[out["company_name"].isin(f["companies"])]
     if f["remote"] is not None:
         out = out[out["is_remote"] == f["remote"]]
 
     # "All time" = no date filter
+# "All time" = no date filter
     if f["max_days"] != "All time" and "collected_at" in out.columns:
-        cutoff = pd.Timestamp.now() - pd.Timedelta(days=f["max_days"])
+        # Extract the timezone from the column (returns None if naive, or the tz if aware)
+        column_tz = out["collected_at"].dt.tz
+        
+        # Inject that timezone into the current timestamp
+        cutoff = pd.Timestamp.now(tz=column_tz) - pd.Timedelta(days=f["max_days"])
         out = out[out["collected_at"] >= cutoff]
 
     return out
@@ -207,8 +213,7 @@ def default_filters() -> dict:
         "seniorities": list(ALL_SENIORITIES),   # all checked by default (intentional)
         "remote":      None,                     # None = "All" (no filter)
         "max_days":    30,
-        "companies":   [],                        # no widget tonight, kept for later
-        "top_n":       10,                         # no widget tonight
+        "companies":   [],
     }
 
 if "filters" not in st.session_state:
@@ -275,8 +280,6 @@ with st.sidebar:
         st.session_state["_filters_dirty"] = True
         st.rerun()
 
-    st.checkbox("🤖 Try AI agent", value=False, key="w_use_agent")
-
     st.divider()
     st.write("Dashboard developed by X")
     st.write("[LinkedIn](https://linkedin.com/in/X)")
@@ -310,7 +313,7 @@ def build_dashboard(d: pd.DataFrame) -> None:
     st.metric("📦 Offers currently displayed", len(d))
 
     # ── Map ──────────────────────────────────────────────────────
-    if {"lat", "lon"}.issubset(d.columns):
+    if {"latitude", "longitude"}.issubset(d.columns):
         map_df = d.dropna(subset=["latitude", "longitude"])
         if not map_df.empty:
             fig_map = px.scatter_mapbox(
@@ -402,3 +405,41 @@ filtered_df = apply_filters(df, f)
 st.subheader("📊 Dashboard")
 build_dashboard(filtered_df)
 st.caption(f"**{len(filtered_df)}** offers match the filters (out of {len(df)}).")
+
+
+# ══════════════════════════════════════════════════════════════════
+# Offers table
+# ══════════════════════════════════════════════════════════════════
+def render_offers_table(d: pd.DataFrame) -> None:
+    if d.empty:
+        return
+    show_cols = [c for c in ["job_title", "company_name", "city", "country",
+                             "seniority", "is_remote", "score_relevancy"] if c in d.columns]
+    st.subheader("📋 Offers")
+    st.dataframe(d[show_cols], hide_index=True, use_container_width=True)
+
+
+render_offers_table(filtered_df)
+
+
+# ══════════════════════════════════════════════════════════════════
+# 💬 Chatbot — simple, sans contexte
+# ══════════════════════════════════════════════════════════════════
+st.divider()
+st.subheader("💬 Chatbot")
+
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []
+
+for role, content in st.session_state["chat_history"]:
+    with st.chat_message(role):
+        st.markdown(content)
+
+prompt = st.chat_input("Ask me anything…")
+if prompt:
+    st.session_state["chat_history"].append(("user", prompt))
+    llm = get_llm()
+    with st.spinner("Thinking…"):
+        resp = llm.llama3_smart.invoke([HumanMessage(content=prompt)])
+    st.session_state["chat_history"].append(("assistant", resp.content))
+    st.rerun()
