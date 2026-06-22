@@ -25,7 +25,7 @@ for dossier in [dossier_parent, dossier_agent, dossier_src, dossier_ui]:
 
 # 4. Importations des modules locaux
 from database import Database
-from silver_enrichment import *
+# from silver_enrichment import *
 from langchain_core.messages import HumanMessage
 
 
