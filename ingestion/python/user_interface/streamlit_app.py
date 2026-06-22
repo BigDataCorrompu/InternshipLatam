@@ -15,10 +15,11 @@ dossier_parent = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # 2. Construit les chemins vers les dossiers contenant vos modules
 # Note : 'database' est généralement dans 'user_interface' ou à la racine de 'python'
 dossier_agent = os.path.join(dossier_parent, "LangGraph_Agent")
+dossier_src = os.path.join(dossier_parent, "src")
 dossier_ui = os.path.join(dossier_parent, "user_interface")
 
 # 3. Ajoute les dossiers au système de recherche de Python s'ils n'y sont pas
-for dossier in [dossier_parent, dossier_agent, dossier_ui]:
+for dossier in [dossier_parent, dossier_agent, dossier_src, dossier_ui]:
     if dossier not in sys.path:
         sys.path.append(dossier)
 
