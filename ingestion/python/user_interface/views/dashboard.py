@@ -42,7 +42,7 @@ from dashboard_agent import (
     summarize_criteria,
 )
 import dashboard_agent
-st.caption(f"agent loaded from: {dashboard_agent.__file__}")
+# st.caption(f"agent loaded from: {dashboard_agent.__file__}")
 
 
 st.set_page_config(page_title="AI Job Offer Dashboard Latam", page_icon="🏙️", layout="wide")
