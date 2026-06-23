@@ -16,7 +16,7 @@ st.set_page_config(
 # 3. Définition des pages (on convertit en chaîne de caractères avec str())
 dashboard_page = st.Page(
     page=str(dashboard_path), 
-    title="Tableau de bord", 
+    title="Dashboard", 
     icon="📊", 
     default=True
 )
