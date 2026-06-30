@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-
+from database import Database
 logger = logging.getLogger(__name__)
 
 
@@ -35,6 +35,46 @@ def load_json(filepath: str, filename: str) -> dict:
     json_text = path.read_text(encoding='utf-8')
     logger.info(f"[READ] file={filename} status=success")
     return json.loads(json_text)
+
+
+
+# The function who saves the jsonfile to the datalake
+def save_to_landing(
+    source: str,
+    directory: str,
+    filename: str,
+    db_config: dict,
+) -> None:
+    
+    offers = load_json(directory, filename)
+    
+    if not offers:
+        logger.warning(f"[LOAD] source={source} status=no_data")
+        return 0
+    
+
+    rows = [
+        (source, json.dumps(o.get("params", {})), json.dumps(o.get("data", [])))
+        for o in offers
+    ]
+
+    db = Database(**db_config)
+    db.bulk_insert(
+        table="landing.raw_job_offers",
+        columns=["source", "params", "data"],
+        data=rows,
+        batch_size=5000,
+    )
+
+    # Supprime le fichier JSON après insertion réussie
+    json_path = Path(directory) / f"{filename}.json"
+    if json_path.exists():
+        json_path.unlink()
+        logger.info(f"[CLEAN] file={json_path.name} status=deleted")
+    
+    logger.info(f"[LOAD] source={source} records={len(rows)} status=success")
+    return len(rows)
+
 
 
 def normalise_list_language(liste_brute):

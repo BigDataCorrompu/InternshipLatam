@@ -1,10 +1,10 @@
 import os 
 import requests
 import psycopg2
-import psycopg2.extras
 from dotenv import load_dotenv
 import logging
 from typing import Literal, Any
+
 
 load_dotenv()
 log = logging.getLogger(__name__)
@@ -17,8 +17,7 @@ class Database:
         db_user:            str = None,
         db_password:        str = None,
         db_sslmode:         str = None,
-        db_channelbinding:  str = None, 
-        mode: Literal['http', 'psycopg2'] = 'http',
+        db_channelbinding:  str = None
     ):
         self.db_host           = db_host           or os.getenv('DB_HOST')
         self.db_name           = db_name           or os.getenv('DB_NAME')
@@ -26,9 +25,7 @@ class Database:
         self.db_password       = db_password       or os.getenv('DB_PASSWORD')
         self.db_sslmode        = db_sslmode        or os.getenv('DB_SSLMODE')
         self.db_channelbinding = db_channelbinding or os.getenv('DB_CHANNELBIDING')
-        self.mode = mode
         self._compose_url()
-        
 
     def _compose_url(self):
         self.database_url = (
@@ -40,28 +37,11 @@ class Database:
 
     def execute(self, query:str, params: list = None) -> list:
         """ PERMET DE GERER UNE BDD LOCAL OU CLOUD (Actuellement uniquement cloud)"""
-        if self.mode == "http":
-            return self._execute_http(query, params)
-        return self._execute_psycopg2(query, params)
-    
+        #Execute HTTP NEON
+        return self._execute_http(query, params)
+        # Execute Psycop2 NEON
+        # Execute local Database
 
-    def _execute_psycopg2(self, query: str, params: list = None) -> list:
-        conn = psycopg2.connect(
-            host=self.db_host,
-            dbname=self.db_name,
-            user=self.db_user,
-            password=self.db_password,
-            sslmode=self.db_sslmode,
-        )
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(query, params)
-                conn.commit()
-                if cur.description:  # SELECT
-                    return [dict(r) for r in cur.fetchall()]
-                return []
-        finally:
-            conn.close()
 
     def _execute_http(self, query: str, params: list = None) -> list:
         """Connexion via HTTP API Neon (port 443)."""
@@ -91,29 +71,39 @@ class Database:
         except Exception as e:
             log.error(f"❌ HTTP Error : {e}")
             raise
-     
-    def bulk_insert(self, table, columns, data, batch_size=200,
-                    onConflict=None, conflict_columns=None, returning=None):
-        total = len(data)
-        inserted = 0
+                
+
+    def bulk_insert(
+            self, 
+            table:str, 
+            columns: list[str], 
+            data: list[tuple[Any]], 
+            batch_size: int=200, 
+            onConflict: Literal["update", "nothing"] | None = None,
+            conflict_columns: list[str] = None,
+            returning: list[str] | None = None  # For insertion in multiple tables
+            ) -> list[dict] | None:
+        total = len(data) # Total of lines to insert
+        inserted = 0 
         all_returned_rows = []
 
-        conflict_clause = self._build_conflict_clause(onConflict, conflict_columns, columns)
-        cols = ", ".join(f'"{c}"' for c in columns)
+        conflict_clause = self._build_conflict_clause(onConflict, conflict_columns, columns) 
+        cols = ", ".join(f'"{c}"' for c in columns) # Generate columns name keeping the upper case 
 
         returning_clause = ""
         if returning:
             returning_cols = ", ".join(f'"{c}"' for c in returning)
             returning_clause = f" RETURNING {returning_cols}"
 
-        for i in range(0, total, batch_size):
-            chunk = data[i:i + batch_size]
-            # FIX bug 3 — placeholder selon le mode
-            rows_placeholders = ", ".join(
-                f"({ ', '.join(self._placeholder(r * len(columns) + j + 1) for j in range(len(columns))) })"
-                for r, _ in enumerate(chunk)
-            )
 
+        for i in range(0, total, batch_size): # Run from first to last with batch_size step
+            chunk = data[i:i + batch_size] # chunk from i to i+batch_size
+            # Parameters : $1, $2, $3...
+            rows_placeholders = ", ".join(
+                f"({ ', '.join(f'${i * len(columns) + j + 1}' for j in range(len(columns))) })"
+                for i, _ in enumerate(chunk)
+            )
+            # Generate query (Handle schemas)
             if '.' in table:
                 schema, tbl = table.split('.', 1)
                 table_sql = f'"{schema}"."{tbl}"'
@@ -122,20 +112,24 @@ class Database:
 
             query = f'INSERT INTO {table_sql} ({cols}) VALUES {rows_placeholders} {conflict_clause}{returning_clause};'
 
+
+            print(f"Query : {query}")
+
+            # Aplatit toutes les valeurs en une seule liste
             params = [None if v is None else v for row in chunk for v in row]
-            result = self.execute(query, params)
+            
+            result = self.execute(query, params)  #  params passés séparément, jamais dans la string
 
             if returning and result:
                 all_returned_rows.extend(result)
-
+            
             inserted += len(chunk)
             log.info(f"✅ Batch {i // batch_size + 1} OK ({inserted}/{total} lignes)")
 
-        log.info(f"✅ Bulk insert terminé ({total} lignes)")
+        log.info(f"✅ Bulk insert terminé ({total} lignes en {-(-total // batch_size)} requêtes)")
+
         return all_returned_rows if returning else None
 
-    def _placeholder(self, index: int) -> str:
-        return f"${index}" if self.mode == "http" else "%s"
 
     def _build_conflict_clause(self, on_conflict, conflict_columns, columns) -> str:
         if not conflict_columns or on_conflict is None:

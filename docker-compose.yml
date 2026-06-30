@@ -1,4 +1,7 @@
 services:
+  # ========================================================================
+  # Airflow (orchestrator)
+  # ========================================================================
   airflow-postgres:
     image: postgres:16-alpine
     container_name: latam_airflow_postgres
@@ -21,6 +24,8 @@ services:
     restart: "no"
     depends_on:
       airflow-postgres:
+        condition: service_healthy
+      local_postgres:
         condition: service_healthy
     env_file:
       - .env
@@ -47,21 +52,32 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+      local_postgres:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__PARALLELISM: 4
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 4
       PYTHONPATH: /opt/airflow/pipeline   # ← pointe vers python/src/
       AIRFLOW_VAR_RAW_DATA_PATH: ${RAW_DATA_PATH}
       # Variables Airflow auto-créées
+      # Neon _________________________________________________
       AIRFLOW_VAR_DB_HOST: ${DB_HOST}
       AIRFLOW_VAR_DB_NAME: ${DB_NAME}
       AIRFLOW_VAR_DB_USER: ${DB_USER}
       AIRFLOW_VAR_DB_PASSWORD: ${DB_PASSWORD}
       AIRFLOW_VAR_DB_SSLMODE: ${DB_SSLMODE}
       AIRFLOW_VAR_DB_CHANNELBINDING: ${DB_CHANNELBINDING}
+      # local postgres _______________________________________
+      AIRFLOW_VAR_LOCAL_DB_HOST: latam_local_postgres
+      AIRFLOW_VAR_LOCAL_DB_NAME: ${LOCAL_DB_NAME}
+      AIRFLOW_VAR_LOCAL_DB_USER: ${LOCAL_DB_USER}
+      AIRFLOW_VAR_LOCAL_DB_PASSWORD: ${LOCAL_DB_PASSWORD}
+      # APIs _________________________________________________
       AIRFLOW_VAR_JSEARCH_APP_KEY: ${JSEARCH_APP_KEY}
       AIRFLOW_VAR_JSEARCH_APP_HOST: ${JSEARCH_APP_HOST}
       AIRFLOW_VAR_CAREERJET_APP_KEY: ${CAREERJET_APP_KEY}
@@ -97,6 +113,29 @@ services:
     ports:
       - "8080:8080"
     command: webserver
+
+
+  # ========================================================================
+  # Local postgresql bdd 
+  # landing before bronze 
+  # staging before silver
+  # ========================================================================
+  local-postgres:
+      image: postgres:16-alpine
+      container_name: latam_local_postgres
+      restart: unless-stopped
+      environment:
+        POSTGRES_USER: ${LOCAL_DB_USER}
+        POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD}
+        POSTGRES_DB: ${LOCAL_DB_NAME}
+      volumes:
+        - /opt/latam/postgres_data:/var/lib/postgresql/data  # ← dossier hôte VPS
+        - ./ingestion/sql/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${LOCAL_DB_USER} -d ${LOCAL_DB_NAME}"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
 
 
   
