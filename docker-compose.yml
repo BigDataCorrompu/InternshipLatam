@@ -71,7 +71,7 @@ services:
       AIRFLOW_VAR_DB_USER: ${DB_USER}
       AIRFLOW_VAR_DB_PASSWORD: ${DB_PASSWORD}
       AIRFLOW_VAR_DB_SSLMODE: ${DB_SSLMODE}
-      AIRFLOW_VAR_DB_CHANNELBINDING: ${DB_CHANNELBINDING}
+      AIRFLOW_VAR_DB_CHANNELBIDING: ${DB_CHANNELBINDING}
       # local postgres _______________________________________
       AIRFLOW_VAR_LOCAL_DB_HOST: latam_local_postgres
       AIRFLOW_VAR_LOCAL_DB_NAME: ${LOCAL_DB_NAME}
