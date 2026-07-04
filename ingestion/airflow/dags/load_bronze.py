@@ -14,16 +14,18 @@ logger = logging.getLogger(__name__)
 
 SCHEDULE = "0 8 * * *"
 JOB_OFFER_TABLE = 'raw.job_offer'
+SOURCES = ["jsearch", "careerjet"]
 
 MAPPERS = {
     "jsearch": JsearchMapper(),
     "careerjet": CareerjetMapper(),
 }
 
+
 @dag(
     dag_id='load_to_bronze',
     start_date=datetime(2026, 6, 7),
-    schedule=SCHEDULE,
+    schedule="0 8 * * *",
     catchup=False,
     max_active_runs=1,
     tags=["ingestion", "bronze", "load"],
@@ -31,15 +33,11 @@ MAPPERS = {
 )
 def load_to_bronze():
 
-    @task(task_id="load_jsearch")
-    def load_jsearch():
-        _load_source("jsearch")
-
-    @task(task_id="load_careerjet")
-    def load_careerjet():
-        _load_source("careerjet")
-
-    [load_jsearch(), load_careerjet()]
+    for source in SOURCES:
+        @task(task_id=f"load_{source}")
+        def load(source=source):   # ← capture la valeur, sinon closure bug
+            _load_source(source)
+        load()
 
 
 def _load_source(source: str) -> None:
@@ -51,6 +49,7 @@ def _load_source(source: str) -> None:
         db_password       = Variable.get("LOCAL_DB_PASSWORD"),
         db_sslmode        = "disable",
         db_channelbinding = "disable",
+        mode              = "psycopg2",   # ← landing locale
     )
 
     rows_landing = db_local.execute(
@@ -89,21 +88,22 @@ def _load_source(source: str) -> None:
     if not all_data:
         raise AirflowSkipException(f"[LOAD] source={source} status=no_valid_records")
 
-    # 3 — Push vers Bronze Neon
+    # 3 — Push vers Bronze Neon (idempotent via ON CONFLICT)
     db_neon = Database(
         db_host           = Variable.get("DB_HOST"),
         db_name           = Variable.get("DB_NAME"),
         db_user           = Variable.get("DB_USER"),
         db_password       = Variable.get("DB_PASSWORD"),
         db_sslmode        = Variable.get("DB_SSLMODE",        default_var="require"),
-        db_channelbinding = Variable.get("DB_CHANNELBINDING", default_var="disable"),
+        db_channelbinding = Variable.get("DB_CHANNELBIDING", default_var="disable"),
+        # mode http par défaut
     )
 
     data_to_insert = mapper.structureToBulkInsert(all_data)
     db_neon.bulk_insert(
         table=JOB_OFFER_TABLE,
         columns=data_to_insert["columns"],
-        data=data_to_insert["data"],
+        data=data_to_insert["data"]
     )
 
     # 4 — Marque comme pushé dans push_history
