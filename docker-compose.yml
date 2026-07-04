@@ -25,7 +25,7 @@ services:
     depends_on:
       airflow-postgres:
         condition: service_healthy
-      local_postgres:
+      local-postgres:
         condition: service_healthy
     env_file:
       - .env
@@ -52,7 +52,7 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-      local_postgres:
+      local-postgres:
         condition: service_healthy
     env_file:
       - .env
@@ -71,7 +71,7 @@ services:
       AIRFLOW_VAR_DB_USER: ${DB_USER}
       AIRFLOW_VAR_DB_PASSWORD: ${DB_PASSWORD}
       AIRFLOW_VAR_DB_SSLMODE: ${DB_SSLMODE}
-      AIRFLOW_VAR_DB_CHANNELBIDING: ${DB_CHANNELBINDING}
+      AIRFLOW_VAR_DB_CHANNELBIDING: ${DB_CHANNELBIDING}
       # local postgres _______________________________________
       AIRFLOW_VAR_LOCAL_DB_HOST: latam_local_postgres
       AIRFLOW_VAR_LOCAL_DB_NAME: ${LOCAL_DB_NAME}
