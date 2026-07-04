@@ -129,8 +129,9 @@ services:
         POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD}
         POSTGRES_DB: ${LOCAL_DB_NAME}
       volumes:
-        - /opt/latam/postgres_data:/var/lib/postgresql/data  # ← dossier hôte VPS
-        - ./ingestion/sql/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+        - /opt/latam/postgres_data:/var/lib/postgresql/data
+        - ./database/migration/004_init_enrichment_staging.sql:/docker-entrypoint-initdb.d/004_init_enrichment_staging.sql
+        - ./database/migration/005_init_raw_landing.sql:/docker-entrypoint-initdb.d/005_init_raw_landing.sql
       healthcheck:
         test: ["CMD-SHELL", "pg_isready -U ${LOCAL_DB_USER} -d ${LOCAL_DB_NAME}"]
         interval: 10s
