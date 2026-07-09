@@ -1,18 +1,16 @@
 from airflow.decorators import dag, task, task_group
 from airflow.models import Variable
-from airflow.utils.trigger_rule import TriggerRule
 from airflow.exceptions import AirflowSkipException
 
 # Ingestion python scripts
-from utils import write_json, load_json, save_to_landing 
+from utils import write_json, load_json, save_to_landing_bucket
 from APIendpoint import JsearchAPI    
-from database import Database
+from bucket import Bucket
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 import logging
 import os
-import json
 logger = logging.getLogger(__name__)
 
 # ___ CONSTANTS _______________________________________________________________
@@ -24,11 +22,12 @@ SCHEDULE_PERIOD = 3 # 3 days
 SCHEDULE = "0 7 */3 * *"
 
 JOB_OFFER_TABLE = 'raw.job_offer'
-JSEARCH_CONFIG = "jsearch_search_config"
-RAW_FILE_JSEARCH = "api_jsearch"
+CONFIG = "jsearch_search_config"
+RAW_FILE = "api_jsearch"
 FILE_NAME = 'jsearch_search'
 
 SOURCE = "jsearch"
+DATA_TYPE = "job_offer"
 
 
 
@@ -47,9 +46,9 @@ def fetch_jsearch_pipeline():
 
 
     @task(task_id="fetch_jsearch")
-    def fetch_jsearch(ds=None) -> None:
+    def fetch_jsearch(ds=None) -> str:
         # Setup config
-        raw = load_json(str(CONFIG_PATH), JSEARCH_CONFIG) # file
+        raw = load_json(str(CONFIG_PATH), CONFIG) # file
         api_key = Variable.get('JSEARCH_APP_KEY') # api key
         jsearch = JsearchAPI(api_key) # request object
         all_responses = list()
@@ -63,54 +62,55 @@ def fetch_jsearch_pipeline():
             try:
                 jobs = jsearch.search_jobs(query=query, paginate=True, **config)
             except Exception as e:
-                logger.warning(f"[EXTRACT] source=jsearch query='{query}' status=error err={e}")
+                logger.warning(f"[EXTRACT] source={SOURCE} query='{query}' status=error err={e}")
                 jobs = []
             all_responses.append({
                 "params": {'query': query} | config,
                 "data" : jobs
             })
-            logger.info(f"[EXTRACT] source=jsearch query='{query}' records={len(jobs)}")
+            logger.info(f"[EXTRACT] source={SOURCE} query='{query}' records={len(jobs)}")
 
             # Gestion quota api    
             if jsearch.quota_exceeded:
-                logger.warning(f"[Extract] source=jsearch exhausted — stopped after query='{query}'")
+                logger.warning(f"[Extract] source={SOURCE} exhausted — stopped after query='{query}'")
                 break
 
         # Load raw in local file
-        directory = RAW_PATH / ds / RAW_FILE_JSEARCH
+        directory = RAW_PATH / ds / RAW_FILE
         directory.mkdir(parents=True, exist_ok=True) # Create file if doesn't exist
-        write_json(str(directory), 'jsearch_search', all_responses)
+        file_path = directory / f"{FILE_NAME}.json"
+        write_json(str(directory), FILE_NAME, all_responses)
 
         total = sum(len(r['data']) for r in all_responses)
-        logger.info(f"[EXTRACT] source=jsearch date={ds} total={total} status=success")
+        logger.info(f"[EXTRACT] source={SOURCE} date={ds} total={total} status=success")
 
         # Gestion quota api
         if jsearch.quota_exceeded and total == 0:               # quota ended and nothing collected -> skip
             raise AirflowSkipException("Jsearch quota exhausted, no offer collected")
             # CAN USE A SECOND API KEY HERE
 
-        return str(directory)
+        return str(file_path)
     
 
     
     @task(task_id="save_to_landing")
-    def save_to_landing_task(directory: str) -> None:
-        count = save_to_landing(
-                        source=SOURCE,
-                        directory=directory,
-                        filename=FILE_NAME,
-                        db_config={
-                            "db_host": Variable.get("LOCAL_DB_HOST"),
-                            "db_name": Variable.get("LOCAL_DB_NAME"),
-                            "db_user": Variable.get("LOCAL_DB_USER"),
-                            "db_password": Variable.get("LOCAL_DB_PASSWORD"),
-                            "db_sslmode": "disable",
-                            "db_channelbinding": "disable",
-                        }
-                    )
-        
-        if count == 0:
+    def save_to_landing_task(file_path: str, ds=None) -> None:
+        bucket = Bucket(
+            key_id=Variable.get("KEY_ID"),
+            app_key=Variable.get("APPLICATION_KEY"),
+            bucket_name=Variable.get("BUCKET_NAME"),
+        )
+        file_data = save_to_landing_bucket(
+            bucket=bucket,
+            api_source=SOURCE,
+            local_file=file_path,
+            data_type=DATA_TYPE,
+            ds=ds,
+        )
+
+        if file_data is None:
             raise AirflowSkipException(f"source={SOURCE} status=no_data")
+        logger.info(f"[LOAD] source={SOURCE} date={ds} status=success")
 
     save_to_landing_task(fetch_jsearch())
 

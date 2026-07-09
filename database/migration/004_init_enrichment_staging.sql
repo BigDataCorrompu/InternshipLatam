@@ -1,9 +1,11 @@
 CREATE SCHEMA IF NOT EXISTS staging;
 
 DROP TABLE IF EXISTS staging.enriched_offers;
+DROP TABLE IF EXISTS staging.transfer_history;
+
 
 CREATE TABLE staging.enriched_offers (
-    id_offer VARCHAR,
+    id_offer VARCHAR PRIMARY KEY,
     raw_result JSONB,
     collected_at TIMESTAMPTZ DEFAULT now()
 );

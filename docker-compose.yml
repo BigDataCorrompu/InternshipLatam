@@ -72,6 +72,10 @@ services:
       AIRFLOW_VAR_DB_PASSWORD: ${DB_PASSWORD}
       AIRFLOW_VAR_DB_SSLMODE: ${DB_SSLMODE}
       AIRFLOW_VAR_DB_CHANNELBIDING: ${DB_CHANNELBIDING}
+      # Backblaze ____________________________________________
+      AIRFLOW_VAR_KEY_ID: ${KEY_ID}
+      AIRFLOW_VAR_APPLICATION_KEY: ${APPLICATION_KEY}
+      AIRFLOW_VAR_BUCKET_NAME: ${BUCKET_NAME}
       # local postgres _______________________________________
       AIRFLOW_VAR_LOCAL_DB_HOST: latam_local_postgres
       AIRFLOW_VAR_LOCAL_DB_NAME: ${LOCAL_DB_NAME}

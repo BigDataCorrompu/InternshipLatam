@@ -46,7 +46,9 @@ erDiagram
   }
   prompt_relevancy {
     INT id_prompt PK
+    VARCHAR id_user 
     TEXT prompt 
+    TIMESTAMPTZ created_at
   }
   company {
     INT id_company PK

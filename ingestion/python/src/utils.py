@@ -1,7 +1,9 @@
 import json
 import logging
+from datetime import datetime 
 from pathlib import Path
 from database import Database
+from bucket import Bucket
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +46,7 @@ def save_to_landing(
     directory: str,
     filename: str,
     db_config: dict,
-) -> None:
+):
     
     offers = load_json(directory, filename)
     
@@ -75,6 +77,69 @@ def save_to_landing(
     logger.info(f"[LOAD] source={source} records={len(rows)} status=success")
     return len(rows)
 
+
+
+def run_fetch(api_client, queries, params, source, extract_query: bool):
+    all_responses = []
+    for q in queries:
+        if extract_query:
+            q_copy = q.copy()
+            query = q_copy.pop('query')
+            config = params | q_copy
+            jobs = api_client.search_jobs(query=query, paginate=True, **config)
+            response_params = {'query': query} | config
+        else:
+            config = params | q
+            jobs = api_client.search_jobs(paginate=True, **config)
+            response_params = config
+        all_responses.append({"params": response_params, "data": jobs})
+        if api_client.quota_exceeded:
+            logger.warning(f"[Extract] source={source} exhausted")
+            break
+    logger.info(f"[EXTRACT] source={source} records={len(jobs)}")
+    return all_responses
+
+def save_to_landing_bucket(
+        bucket: Bucket,
+        api_source: str, 
+        local_file: str,
+        data_type: str, # job_offer, company_info ...
+        ds: str,
+    ) -> str:
+    """
+    Upload raw json file to b2 bucket using norm 'year/month/source/' + file_name
+    Airflow ds (YYYY-MM-DD) is time base.
+    Return bucket path (b2_key).
+    """
+    # Verification
+    local_path_obj = Path(local_file)
+    if not local_path_obj.exists():
+        logger.warning(f"[LANDING] ⚠️ No local file to upload for {api_source} on {ds}. Skipping.")
+        return None
+
+    # ds = "2026-06-08" → year=2026, month=06
+    dt = datetime.strptime(ds, '%Y-%m-%d')
+    year = dt.year
+    month = f"{dt.month:02d}"
+
+    # Bucket path : data_type/year/month/api_source
+    bucket_dir = f"{data_type}/{year}/{month}/{api_source}"
+
+    # File name : {ds}_{api_source}
+    file_name = f"{ds}_{api_source}"
+
+    # Paths
+    path_bucket = str((Path(bucket_dir) / file_name).with_suffix('.json'))
+
+    # Load in bucket
+    bucket.upload_file(bucket_path=path_bucket, local_path=local_file)
+    logger.info(f"[LANDING] file={file_name} status=uploaded bucket_path={path_bucket}")
+
+    # Delete local file once it's in the bucket
+    Path(local_file).unlink(missing_ok=True)
+    logger.info(f"[CLEAN] file={local_file} status=deleted")
+
+    return path_bucket
 
 
 def normalise_list_language(liste_brute):

@@ -1,18 +1,16 @@
 from airflow.decorators import dag, task, task_group
 from airflow.models import Variable
-from airflow.utils.trigger_rule import TriggerRule
 from airflow.exceptions import AirflowSkipException
 
 # Ingestion python scripts
-from utils import write_json, load_json, save_to_landing 
+from utils import write_json, load_json, save_to_landing_bucket
 from APIendpoint import CareerJetAPI  
-from database import Database
+from bucket import Bucket
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 import logging
 import os
-import json
 logger = logging.getLogger(__name__)
 
 
@@ -29,11 +27,12 @@ SCHEDULE_PERIOD = 3 # 3 days
 SCHEDULE = "0 6 */3 * *"
 
 JOB_OFFER_TABLE = 'raw.job_offer'
-CAREERJET_CONFIG = "careerjet_search_config"
-RAW_FILE_CAREERJET = "api_careerjet"
+CONFIG = "careerjet_search_config"
+RAW_FILE = "api_careerjet"
 FILE_NAME = 'careerjet_search'
 
 SOURCE = "careerjet"
+DATA_TYPE = "job_offer"
 
 
 
@@ -53,7 +52,7 @@ def fetch_careerjet_pipeline():
     @task(task_id="fetch_careerjet")
     def fetch_careerjet(ds=None) -> str:
         # Setup config
-        raw  = load_json(str(CONFIG_PATH), CAREERJET_CONFIG)
+        raw  = load_json(str(CONFIG_PATH), CONFIG)
         api_key = Variable.get('CAREERJET_APP_KEY')
         user_ip = Variable.get('SERVER_IP')
         user_agent = Variable.get('CAREERJET_USER_AGENT')
@@ -65,6 +64,7 @@ def fetch_careerjet_pipeline():
         )
         all_responses = list()
 
+        # Call API
         params = raw.get("default_params", {}) # get api call paremeter
         for q in raw.get('queries', []):
             config = params | q
@@ -74,45 +74,48 @@ def fetch_careerjet_pipeline():
                 'data': jobs
             })
             keywords_debug = q.get('keywords', {})
-            logger.info(f"[EXTRACT] source=careerjet keyword={keywords_debug} records={len(jobs)}")
+            logger.info(f"[EXTRACT] source={SOURCE} keyword={keywords_debug} records={len(jobs)}")
             
             # Gestion quota api    
             if careerjet.quota_exceeded:
-                logger.warning(f"[Extract] source=jsearch exhausted — stopped after keyword={keywords_debug}")
+                logger.warning(f"[Extract] source={SOURCE} exhausted — stopped after keyword={keywords_debug}")
                 break
 
         # Load raw in local file
-        directory = RAW_PATH / ds / RAW_FILE_CAREERJET
+        directory = RAW_PATH / ds / RAW_FILE
         directory.mkdir(parents=True, exist_ok=True) # Create file if doesn't exist
+        file_path = directory / f"{FILE_NAME}.json"
         write_json(str(directory), FILE_NAME, all_responses)
         total = sum(len(r['data']) for r in all_responses)
-        logger.info(f"[EXTRACT] source=careerjet date={ds} total={total} status=success")
+        logger.info(f"[EXTRACT] source={SOURCE} date={ds} total={total} status=success")
 
         # Gestion quota api  
         if careerjet.quota_exceeded and total == 0:               # quota ended and nothing collected -> skip
             raise AirflowSkipException("CareerJet quota exhausted, no offer collected")
             # CAN USE A SECOND API KEY HERE
 
-        return str(directory)
+        return str(file_path)
+    
 
     @task(task_id="save_to_landing")
-    def save_to_landing_task(directory: str) -> None:
-        count = save_to_landing(
-                        source=SOURCE,
-                        directory=directory,
-                        filename=FILE_NAME,
-                        db_config={
-                            "db_host": Variable.get("LOCAL_DB_HOST"),
-                            "db_name": Variable.get("LOCAL_DB_NAME"),
-                            "db_user": Variable.get("LOCAL_DB_USER"),
-                            "db_password": Variable.get("LOCAL_DB_PASSWORD"),
-                            "db_sslmode": "disable",
-                            "db_channelbinding": "disable",
-                        }
-                    )
-        
-        if count == 0:
+    def save_to_landing_task(file_path: str, ds=None) -> None:
+        bucket = Bucket(
+            key_id=Variable.get("KEY_ID"),
+            app_key=Variable.get("APPLICATION_KEY"),
+            bucket_name=Variable.get("BUCKET_NAME"),
+        )
+        file_data = save_to_landing_bucket(
+            bucket=bucket,
+            api_source=SOURCE,
+            local_file=file_path,
+            data_type=DATA_TYPE,
+            ds=ds,
+        )
+
+        if file_data is None:
             raise AirflowSkipException(f"source={SOURCE} status=no_data")
+        logger.info(f"[LOAD] source={SOURCE} date={ds} status=success")
+        
 
     save_to_landing_task(fetch_careerjet())
 

@@ -111,11 +111,11 @@ DROP TABLE IF EXISTS analytics.prompt_relevancy CASCADE;
 
 CREATE TABLE analytics.prompt_relevancy (
     id_prompt       SERIAL          PRIMARY KEY,
+    id_user         VARCHAR         NOT NULL DEFAULT 'default',
     prompt          TEXT            NOT NULL,
-    created_at      TIMESTAMPTZ     DEFAULT NOW(),
-
-    UNIQUE (prompt)                     -- ajouté : nécessaire pour ON CONFLICT (prompt)
+    created_at      TIMESTAMPTZ     DEFAULT NOW()
 );
+
 
 -- ============================================================
 -- 7. job_relevancy — append only, scores dimensionnels par prompt
