@@ -86,117 +86,138 @@ class LLM:
         
 # =========================== STATE ===========================
 # Public State
-class JobOfferState(TypedDict):
-    # ── keys ──
-    id_job: str
-    id_company: int | None    
-    id_location: int | None   
 
-    # ── analytics.job_offer ──
+class JobOfferState(TypedDict):
+    # ── Keys ──────────────────────────────────────────────────────
+    id_job: str
+    id_company: int | None
+    id_location: int | None
+
+    # ── analytics.job_offer ───────────────────────────────────────
     api_source: str
     job_title: str
     offer_description: str
-    contract_type: str | None   
-    is_remote: bool | None   
-    job_publisher: str | None   
-    location_raw: str | None    
-    offer_url: str | None   
-    source_platform: str | None   
-    spoken_languages_required: Annotated[list[str], operator.add] | None  
-    published_at: str | None   
+    contract_type: str | None
+    is_remote: bool | None
+    job_publisher: str | None
+    location_raw: str | None
+    offer_url: str | None
+    source_platform: str | None
+    published_at: str | None
     collected_at: str
 
-    # ── analytics.job_requirement ──
+    # ── analytics.job_requirement ─────────────────────────────────
     seniority: str | None
-    alternative_job_titles: Annotated[list[str], operator.add] | None  
+    spoken_languages_required: Annotated[list[str], operator.add] | None
+    alternative_job_titles: Annotated[list[str], operator.add] | None
     skills_languages: Annotated[list[str], operator.add] | None
     skills_framework: Annotated[list[str], operator.add] | None
     skills_aptitudes: Annotated[list[str], operator.add] | None
     skills_soft: Annotated[list[str], operator.add] | None
 
-    # ── analytics.job_relevancy ──
-    score_relevancy: float | None   
-    score_details: dict | None   
-    explanation: str | None  
-    prompt_user_profile: str | None 
+    # ── analytics.job_relevancy ───────────────────────────────────
+    score_relevancy: float | None
+    score_details: dict | None
+    explanation: str | None
 
-    # ── analytics.company ──
-    company_name: str | None   
-    company_website: str | None   
-    company_primary_type: str | None   
+    # ── analytics.prompt_relevancy ────────────────────────────────
+    id_prompt_user_profile: int | None
+    prompt_user_profile: str | None  
 
-    # ── analytics.company_location ──
-    address: str | None   
-    city: str | None   
-    country: str | None   
-    lat: float | None   
-    lon: float | None   
-    phone: str | None   
-    business_status: str | None   
+    # ── analytics.company ─────────────────────────────────────────
+    company_name: str | None
+    company_website: str | None
+    company_primary_type: str | None
 
+    # ── analytics.company_location ────────────────────────────────
+    address: str | None
+    city: str | None
+    country: str | None
+    lat: float | None
+    lon: float | None
+    phone: str | None
+    business_status: str | None
 
-    # ── analytics.company_contact ──
+    # ── analytics.company_contact ─────────────────────────────────
     contacts: Annotated[list[dict], operator.add]
+    search_query_mail: str | None
+
+    # ── Variables de contrôle (graph interne, non persistées) ─────
+    _location_failed: bool
+    _location_retry_attempted: bool
+
+def map_prompt_to_JobOfferState(row: dict) -> JobOfferState:
+        """
+        Mapping from analytics.prompt_relevancy database row to LangGraph state.
+        All enrichment fields start at None or [] — filled by the graph nodes.
+        """
+        return {
+            # ── analytics.prompt_relevancy ────────────────────────────
+            "id_prompt_user_profile": row.get("id_prompt"),
+            "prompt_user_profile": row.get("prompt"),
+        }
 
 def map_bronze_to_JobOfferState(row: dict) -> JobOfferState:
     """
-    Mapping from database to graph state. (Better for maintenance and debug)
-    If a value is absente instantiate None or []
+    Mapping from raw.job_offer database row to LangGraph state.
+    All enrichment fields start at None or [] — filled by the graph nodes.
     """
     return {
-        # ── keys ──
+        # ── Keys ──────────────────────────────────────────────────
         "id_job": row["id_job"],
         "id_company": None,
         "id_location": None,
 
-        # ── analytics.job_offer ──
-        "api_source": row["api_source"],
-        "job_title": row["job_title"],
-        "offer_description": row["offer_description"],
-        "contract_type": row["contract_type"],
-        "is_remote": row["is_remote"],
-        "job_publisher": row["job_publisher"],
-        "location_raw": row["location_raw"],
-        "offer_url": row["offer_url"],
-        "source_platform": row["source_platform"],
-        "spoken_languages_required": None,
-        "published_at": row["published_at"],
+        # ── analytics.job_offer ───────────────────────────────────
+        "api_source": row.get("api_source"),
+        "job_title": row.get("job_title"),
+        "offer_description": row.get("offer_description"),
+        "contract_type": row.get("contract_type"),
+        "is_remote": row.get("is_remote"),
+        "job_publisher": row.get("job_publisher"),
+        "location_raw": row.get("location_raw"),
+        "offer_url": row.get("offer_url"),
+        "source_platform": row.get("source_platform"),
+        "published_at": row.get("published_at"),
         "collected_at": row["collected_at"],
 
-        # ── analytics.job_requirement ──
+        # ── analytics.job_requirement ─────────────────────────────
         "seniority": None,
+        "spoken_languages_required": [],
         "alternative_job_titles": [],
         "skills_languages": [],
         "skills_framework": [],
         "skills_aptitudes": [],
         "skills_soft": [],
 
-
-        # ── analytics.job_relevancy ──
+        # ── analytics.job_relevancy ───────────────────────────────
         "score_relevancy": None,
         "score_details": None,
         "explanation": None,
-        "prompt_user_profile": None,
 
-        # ── analytics.company ──
-        "company_name": row["company"],          # ⚠️ raw.company → state.company_name
-        "company_website": row["company_website"],
+
+        # ── analytics.company ─────────────────────────────────────
+        "company_name": row.get("company"),       
+        "company_website": row.get("company_website"),
         "company_primary_type": None,
 
-        # ── analytics.company_location ──
+        # ── analytics.company_location ────────────────────────────
         "address": None,
-        "city": row["city"],
-        "country": row["country"],
-        "lat": row["latitude"],                   # ⚠️ raw.latitude → state.lat
-        "lon": row["longitude"],                   # ⚠️ raw.longitude → state.lon
+        "city": row.get("city"),
+        "country": row.get("country"),
+        "lat": row.get("latitude"),                 
+        "lon": row.get("longitude"),                 
         "phone": None,
         "business_status": None,
 
-        # ── analytics.company_contact ──
+        # ── analytics.company_contact ─────────────────────────────
         "contacts": [],
-        "search_query_mail": None
-    }
+        "search_query_mail": None,
 
+        # ── Variables de contrôle ─────────────────────────────────
+        "_location_failed": False,
+        "_location_retry_attempted": False,
+    }
     
 
 
@@ -225,13 +246,14 @@ class Extract:
                             ALWAYS REPLY IN ENGLISH even if the task or the text you analyse is in other language.
                             You MUST respond ONLY using the structured format provided, never write a conversational explanation.
                             If no data is found, return null or an empty list. Do not explain why, just do as the explained structure format
-                            If no information is available, do not invent one and return null for this field
+                            If no information is available, do not invent one: return null for single value fields, and an empty list [] for array/list fields.
                         """)
         user = HumanMessage(content=context)
 
         try:
             response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
             data = response.model_dump()
+            print(f"DEBUG LLM RAW OUTPUT: {data}") # <--- REGARDEZ LA CONSOLE
             if len(data) == 1:
                 return {self._output_key: next(iter(data.values()))}
             return data
@@ -315,7 +337,7 @@ class FindLocation:
         result = self._geo_api.search_place(company, location)
         if not result:
             print(f"⚠️  find_location: aucun résultat pour {company} @ {location}")
-            return {}
+            return {"_location_failed": True}
         
         result["location_raw"] = location  # overwrite with the cleaned value
         
@@ -538,15 +560,23 @@ class OfferRelevancy(BaseModel):
             return None  # Sécurité supplémentaire si Groq renvoie du texte inexploitable
 
 class DetermineRelevancy:
-    def __init__(self, llm, profile: str):
+    def __init__(self, llm):
         """
         llm : instance of the llm used to answer
         profile : text describing the user profile (languages, experience, target locations, skills ...)
         """
-        self._profile = profile
         self._llm_structured = llm.with_structured_output(OfferRelevancy)
 
     def __call__(self, state: JobOfferState) -> dict:
+        # Récupération dynamique du profil utilisateur depuis le state
+        profile = state.get("prompt_user_profile")
+        
+        # Sécurité si jamais le profil est vide
+        if not profile:
+            print(f"⚠️  DetermineRelevancy: 'prompt_user_profile' is missing in {state.get('id_job')}.")
+            profile = "No profile provided." # fallback par défaut
+            
+
         context = "\n".join([
             f"job_title: {state.get('job_title')}",
             f"spoken_languages_required: {state.get('spoken_languages_required')}",
@@ -571,7 +601,7 @@ class DetermineRelevancy:
             Attribute a grade from 0 to 10 for each criterion.
         
             My profile:
-            {self._profile} 
+            {profile} 
         """)
 
         user = HumanMessage(content=context)
@@ -587,14 +617,14 @@ class DetermineRelevancy:
             return {
                 "score_details": data,
                 "explanation": explanation,
-                "prompt_user_profile": self._profile
+                "prompt_user_profile": None
             }
         except Exception as e:
             print(f"Error calculate_relevancy for id={state.get('id_job')}: {e}")
             return {
                 "score_details": None,
                 "explanation": None,
-                "prompt_user_profile": self._profile
+                "prompt_user_profile": None
             }
 
 def calculate_total_score(state: JobOfferState, weights: dict) -> dict:

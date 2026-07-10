@@ -91,6 +91,7 @@ DROP TABLE IF EXISTS analytics.job_requirement CASCADE;
 CREATE TABLE analytics.job_requirement (
     id              SERIAL          PRIMARY KEY,
     id_offer        VARCHAR(50)     NOT NULL REFERENCES analytics.job_offer(id_offer),
+    id_prompt               INT             REFERENCES analytics.prompt_relevancy(id_prompt),
     alternative_job_titles  TEXT[],
     offer_languages         TEXT[],
     seniority               VARCHAR(20),
@@ -98,7 +99,6 @@ CREATE TABLE analytics.job_requirement (
     skills_frameworks       TEXT[],
     skills_aptitudes        TEXT[],
     skills_soft             TEXT[],
-    prompt_version          VARCHAR(50),
     collected_at             TIMESTAMPTZ     DEFAULT NOW(),
 
     UNIQUE (id_offer)                   -- ajouté : nécessaire pour ON CONFLICT (id_offer)

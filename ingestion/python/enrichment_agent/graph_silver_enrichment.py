@@ -9,7 +9,6 @@ llm = LLM()
 placesAPI = PlacesAPI(os.getenv('MAPS_APP_KEY'))
 
 # =========================== Company handle ===========================
-# =========================== Location handle ===========================
 class CompanyOutput(BaseModel):
     company_name: str | None = Field(
         description="Name of the company recruiting for this offer, mentioned in the text. Do not invent or mistake a software/tool name for the company name. Return null if not found."
@@ -25,13 +24,14 @@ extract_company = Extract(
     fields=['job_title', 'offer_description']
 )
 
-
+# =========================== Location handle ===========================
 class LocationRawOutput(BaseModel):
     location_raw: str | None = Field(
         description= ("A location hint suitable for a Google Maps query. "
         "If you can enrich the existing location_raw with city/country/offer_description, do so. "
         "If you find nothing additional, just return the existing location_raw unchanged.")
     )
+
 extract_location = Extract(
     llm=llm.enrichement,
     task=(
@@ -47,7 +47,7 @@ extract_location = Extract(
 def extract_location_node(state: JobOfferState) -> dict:
     original_location = state.get("location_raw")
     result = extract_location(state)
-
+    result["_location_retry_attempted"] = True
     if not result.get("location_raw") or result["location_raw"] == "null":
         result["location_raw"] = original_location
 
@@ -98,14 +98,15 @@ class OfferAttribute(BaseModel):
             "Find it strictly from the text or use 'unknown' if not clearly stated."
         )
     )
-    spoken_languages_required: list[str] = Field(
+    spoken_languages_required: list[str] | None = Field(
         description=(
             "Detect the speaking language required for this job offer."
             "Strictly identify the human language required to speak/work in the position."
+            "CRITICAL: If no specific language requirement is explicitly mentioned in the text, "
+            "DEFAULT to the language in which the job offer is written (e.g., ['en'] if the text is in English)."
             "EXCLUDE languages that are only used as 'tech keywords' (e.g., if a job is in Spanish but mentions 'English documentation', do NOT add 'en')."
             "If the job description is written in one language and no other is required, return only the language of the description."
             "CRITICAL: Return ONLY the ISO 639-1 codes (e.g., ['es'], ['fr'], ['pt']). Do NOT return the full language names."
-            "If you are unsure, default to the language of the offer text itself."
         )
     )
     @field_validator("is_remote", mode="before")
@@ -121,7 +122,7 @@ extract_attributes = Extract(
         'Find the seniority needed for this job offer or deduct it. '
         'Find if the offer is in remote strictly from the text. '
         'Find the contract type strictly from the text. '
-        'Find the language of the offer.'
+        'Identify the spoken languages required for the position (as ISO 639-1 codes).'
     ),
     output_key='attributes',
     schema=OfferAttribute,
@@ -133,11 +134,11 @@ extract_attributes = Extract(
 
 # =========================== Skills handle ===========================
 class OfferSkills(BaseModel):
-    skills_languages: list[str] = Field(description="Programming language mentionned in the offer, for example python, sql, terraform")
-    skills_framework: list[str] = Field(description="Framework mentionned in the offer, for exemple airflow, AWS")
+    skills_languages: list[str] = Field(description="Programming language mentionned in the offer, e.g python, sql, terraform")
+    skills_framework: list[str] = Field(description="Framework mentionned in the offer, e.g airflow, AWS")
     skills_aptitudes: list[str] = Field(
         description=(
-            "Technical competencies or domain knowledge needed for this job, for example "
+            "Technical competencies or domain knowledge needed for this job, e.g "
             "cloud architecture, database management, data warehousing, ETL design. "
             "Do NOT include job titles or role names (e.g. 'Data Engineer', 'Analytics Engineer', "
             "'BI Developer') — those belong to alternative_job_titles, not here."
@@ -168,82 +169,18 @@ extract_skills = Extract(
 )
 
 # =========================== Relevancy handle ===========================
-profile = """
-Etudiant ingénieur français
-Languages informatique : python intermédiaire, sql intermédiaire, java intermédiaire, C débutant, C++ base, Terraform base
-Framework : Docker intermédiaire, airflow débutant, PostgreSQL intermédiaire, cloud neon débutant, aws base, LangGraph, débutant 
-Ce que je cherche : Un stage en Amérique latine nottament Argentine, Chilie et Urugay dans les capitales en priorité donc Santiago, Buenos Aires, Montevideo.
-Je veux developper mes connaissance en cloud data engineering nottament AWS et l'ajout d'intégration LLM dans le processus de production avec LangGraph. 
-Je parle français C2, anglais B2, espagnol débutant A2.
-Je veux faire un stage a temps plein sur le lieux de l'ebtreprise, le remote hybride ne me derange pas
-"""
-determine_relevancy = DetermineRelevancy(llm=llm.enrichement, profile=profile)
+# profile = """
+# Etudiant ingénieur français
+# Languages informatique : python intermédiaire, sql intermédiaire, java intermédiaire, C débutant, C++ base, Terraform base
+# Framework : Docker intermédiaire, airflow débutant, PostgreSQL intermédiaire, cloud neon débutant, aws base, LangGraph, débutant 
+# Ce que je cherche : Un stage en Amérique latine nottament Argentine, Chilie et Urugay dans les capitales en priorité donc Santiago, Buenos Aires, Montevideo.
+# Je veux developper mes connaissance en cloud data engineering nottament AWS et l'ajout d'intégration LLM dans le processus de production avec LangGraph. 
+# Je parle français C2, anglais B2, espagnol débutant A2.
+# Je veux faire un stage a temps plein sur le lieux de l'ebtreprise, le remote hybride ne me derange pas
+# """
+determine_relevancy = DetermineRelevancy(llm=llm.enrichement)
 
 calculate_relevancy = partial(calculate_total_score, weights=WEIGHTS)
-
-
-# # =========================== Route ===========================
-# # Does we need to extract company or we can keep going
-# route_to_extract_company = make_binary_route_node(
-#     primary_key="company_name",
-#     condition=[None, 'null', '', "Empresa confidencial"],
-#     node_if_true=['extract_company'], # Skip extract company
-#     node_if_false=['extract_location', 'extract_attributes', 'extract_skills']
-# )
-
-# # Can we keep dealing with this offer 
-# route_company_to_end = make_binary_route_node(
-#     primary_key="company_name",
-#     condition=[None, 'null', '', "Empresa confidencial"],
-#     node_if_true=[END], # End the graph, impossible to deal with the offer if no company
-#     node_if_false=["extract_location", "extract_attributes", "extract_skills"] # Keep going
-# )
-
-
-
-# # Graph intialisation __________________________________________________________________
-# builder = StateGraph(JobOfferState)
-
-# # Initial route ________________________________________________________________________
-# builder.add_conditional_edges(
-#     START,              # ← un VRAI nœud, déjà ajouté avec add_node
-#     route_to_extract_company,       # ← la fonction qui décide où aller
-#     ['extract_location', 'extract_attributes', 'extract_skills', 'extract_company']
-# )
-
-
-# # Company ______________________________________________________________________________
-# builder.add_sequence([
-#     ("extract_company", extract_company),
-#     ("verify_company", verify_company),
-# ])
-
-# builder.add_conditional_edges(
-#     "verify_company",              # ← un VRAI nœud, déjà ajouté avec add_node
-#     route_company_to_end,       # ← la fonction qui décide où aller
-#     ["extract_location", "extract_attributes", "extract_skills", END]
-# )
-
-# # Location & contacts ___________________________________________________________________
-# builder.add_sequence([
-#     ("extract_location", extract_location_node),
-#     ("find_location", find_location),
-#     ("find_mails", find_mails)
-# ])
-# builder.add_edge("find_mails", END)
-
-# # Scoring ______________________________________________________________________________
-# builder.add_sequence([
-#     ("determine_relevancy", determine_relevancy),
-#     ("calculate_relevancy", calculate_relevancy)
-# ])
-# builder.add_edge("calculate_relevancy", END)
-
-# # Attributes & skills ___________________________________________________________________
-# builder.add_node("extract_attributes", extract_attributes)
-# builder.add_node("extract_skills", extract_skills)
-# builder.add_edge(["extract_attributes", "extract_skills", "find_location"], "determine_relevancy")
-
 
 
 
@@ -254,7 +191,7 @@ route_to_extract_company = make_binary_route_node(
     primary_key="company_name",
     condition=[None, 'null', '', "Empresa confidencial"],
     node_if_true=['extract_company'],
-    node_if_false=['extract_location']
+    node_if_false=['find_location']
 )
 
 # Can we keep dealing with this offer 
@@ -262,21 +199,31 @@ route_company_to_end = make_binary_route_node(
     primary_key="company_name",
     condition=[None, 'null', '', "Empresa confidencial"],
     node_if_true=[END],
-    node_if_false=["extract_location"]
+    node_if_false=["find_location"]
 )
 
 
 
-# Graph intialisation __________________________________________________________________
+def route_after_find_location(state: JobOfferState):    
+    # if find_location failed but we haven't tried extract_location yet
+    if state.get("_location_failed") and not state.get("_location_retry_attempted"):
+        return "extract_location"
+    
+    # Continue the graph
+    return "extract_attributes"
+
+
+
+
+# =========================== Graph intialisation ===========================
 builder = StateGraph(JobOfferState)
 
 # Initial route ________________________________________________________________________
 builder.add_conditional_edges(
     START,
     route_to_extract_company,
-    ['extract_location', 'extract_company']
+    ['find_location', 'extract_company']
 )
-
 
 # Company ______________________________________________________________________________
 builder.add_sequence([
@@ -287,18 +234,35 @@ builder.add_sequence([
 builder.add_conditional_edges(
     "verify_company",
     route_company_to_end,
-    ["extract_location", END]
+    ["find_location", END]
 )
 
-# Location → Attributes → Skills → Mails, tout en séquentiel ___________________________
+# Location (La boucle d'essai) _________________________________________________________
+# Ajout explicite des nœuds
+builder.add_node("find_location", find_location)
+builder.add_node("extract_location", extract_location_node)
+
+# La condition après find_location
+builder.add_conditional_edges(
+    "find_location",
+    route_after_find_location,
+    {
+        "extract_location": "extract_location",
+        "extract_attributes": "extract_attributes"
+    }
+)
+
+# Si on passe par l'enrichissement, on retourne tester
+builder.add_edge("extract_location", "find_location")
+
+# Attributes & Skills __________________________________________________________________
 builder.add_sequence([
-    ("extract_location", extract_location_node),
-    ("find_location", find_location),
     ("extract_attributes", extract_attributes),
     ("extract_skills", extract_skills),
-    ("find_mails", find_mails),
 ])
-builder.add_edge("find_mails", END)
+
+# De skills, on passe directement au scoring
+builder.add_edge("extract_skills", "determine_relevancy")
 
 # Scoring ______________________________________________________________________________
 builder.add_sequence([
@@ -306,5 +270,3 @@ builder.add_sequence([
     ("calculate_relevancy", calculate_relevancy)
 ])
 builder.add_edge("calculate_relevancy", END)
-
-builder.add_edge("extract_skills", "determine_relevancy")
