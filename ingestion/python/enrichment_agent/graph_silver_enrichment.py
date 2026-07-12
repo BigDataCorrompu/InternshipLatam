@@ -5,18 +5,41 @@ import os
 import sys
 sys.path.append("../src")
 from APIendpoint import PlacesAPI
+from LLMprovider import LLM
 llm = LLM()
 placesAPI = PlacesAPI(os.getenv('MAPS_APP_KEY'))
 
 # =========================== Company handle ===========================
 class CompanyOutput(BaseModel):
     company_name: str | None = Field(
-        description="Name of the company recruiting for this offer, mentioned in the text. Do not invent or mistake a software/tool name for the company name. Return null if not found."
+        description=(
+            "Name of the FINAL HIRING company — the actual employer, not an intermediary. "
+            "EXCLUDE recruitment agencies, staffing firms, job boards, or freelance platforms "
+            "acting as intermediaries (e.g. Michael Page, LinkedIn, Jobgether, Mercor, Outlier AI, "
+            "WomenTech Network, Talentfinder, generic job aggregators, Linkedin). "
+            "If the offer is published BY an agency BUT clearly recruiting FOR a named client company, "
+            "return the client's name, not the agency's. "
+            "If only the agency/platform name is available and no final employer is mentioned, "
+            "return null — do not return the agency name as if it were the employer. "
+            "Do not invent or mistake a software/tool name for the company name."
+        )
     )
+    source_platform: str | None = Field(
+        description=(
+            "Name of the recruitment agency, staffing firm, job board, or freelance platform "
+            "that published this offer, IF it acts as an intermediary (e.g. Michael Page, LinkedIn, "
+            "Jobgether, Mercor, Outlier AI, WomenTech Network, Talentfinder). "
+            "Return null if the offer was published directly by the final hiring company itself."
+        )
+    )
+
 extract_company = Extract(
     llm=llm.enrichement,
     task=(
-        "Find the name of the company recruiting for this job offer, based on the title and description. "
+        "Find the name of the FINAL hiring company recruiting for this job offer — not a recruitment "
+        "agency, job board, or freelance platform acting as an intermediary. If an agency published "
+        "the offer but names a client company, return the client's name in company_name, and the "
+        "agency's name in source_platform. "
         "The name must be explicitly mentioned in the text — do not invent it or mistake a software/tool name for it."
     ),
     output_key='company_name',
@@ -72,20 +95,25 @@ find_mails = FindMails(llm=llm)
 class OfferAttribute(BaseModel):
     seniority: Literal["junior", "mid", "senior", "unknown"] = Field(
         description=(
-            "Seniority level required for the position. Use 'unknown' if not clearly stated."
-            "Map LATAM abbreviations: JR/Jr → junior, SSR/Ssr/Semi-Senior/Pleno → mid, SR/Sr/Senior → senior."
-            "You can deduct it but if you don't find just use 'unknown'"
+            "Seniority level required for the position. "
+            "ALWAYS try to infer it, even if not explicitly stated: "
+            "look at years of experience required, scope of responsibilities, autonomy expected, "
+            "job title nuances (e.g. 'Lead', 'Head of' → senior; no experience required, 'Junior', 'Trainee' → junior), "
+            "and the seniority implied by the tasks described. "
+            "Map LATAM abbreviations: JR/Jr → junior, SSR/Ssr/Semi-Senior/Pleno → mid, SR/Sr/Senior → senior. "
+            "Only use 'unknown' as a last resort, when the offer gives absolutely no clue "
+            "about experience level, responsibilities, or seniority-related keywords. "
             "The offer can be in any language."
         )
     )
     is_remote: bool | str = Field(
         description=(
             "True if the job is fully or partially remote, False if on-site only. "
-            "Infer from keywords like 'remoto', 'remote', 'teletrabajo', 'hybrid', 'presencial'."
+            "Infer from keywords like 'remoto', 'remote', 'teletrabajo', 'hybrid', 'presencial'. "
             "A raw is_remote value extracted from the source platform is also provided as a hint, "
             "use it only when the text itself is ambiguous or silent, the text always takes priority if it contradicts the hint. "
-            "The offer can be in any language."
-            "If you can't determine if it's remote just return False"
+            "The offer can be in any language. "
+            "If genuinely no clue exists, default to False."
         )
     )
     contract_type: Literal["internship", "fulltime", "parttime", "freelance", "unknown"] = Field(
@@ -95,12 +123,16 @@ class OfferAttribute(BaseModel):
             "'tiempo completo', 'full-time', 'CDI' → fulltime. "
             "'medio tiempo', 'part-time' → parttime. "
             "'freelance', 'contractor', 'consultor independiente' → freelance. "
-            "Find it strictly from the text or use 'unknown' if not clearly stated."
+            "If not explicitly stated, INFER from context: most standard job postings without "
+            "an internship/part-time/freelance mention are implicitly full-time positions. "
+            "Only use 'unknown' if the offer is genuinely too vague to make even that inference "
+            "(e.g. a very short fragment description)."
         )
     )
     spoken_languages_required: list[str] | None = Field(
         description=(
-            "Detect the speaking language required for this job offer."
+            "Detect the speaking language in which the offer is written, "
+            "AND the required languages for this job offer mentionned in the offer."
             "Strictly identify the human language required to speak/work in the position."
             "CRITICAL: If no specific language requirement is explicitly mentioned in the text, "
             "DEFAULT to the language in which the job offer is written (e.g., ['en'] if the text is in English)."
@@ -141,16 +173,16 @@ class OfferSkills(BaseModel):
             "Technical competencies or domain knowledge needed for this job, e.g "
             "cloud architecture, database management, data warehousing, ETL design. "
             "Do NOT include job titles or role names (e.g. 'Data Engineer', 'Analytics Engineer', "
-            "'BI Developer') — those belong to alternative_job_titles, not here."
+            "'BI Developer') — those belong to related_job_titles, not here."
         )
     )
     skills_soft: list[str] = Field(description="Soft skills needed for this job, for example communication")
-    alternative_job_titles: list[str] = Field(
+    related_job_titles: list[str] = Field(
         description=(
-            "Other job titles or role names mentioned in the offer as equivalent or acceptable "
-            "for this position, besides the main job_title already known "
-            "(e.g. if the offer says 'Data Engineer, Analytics Engineer or BI Developer', "
-            "list all of them here, including the one matching job_title if repeated)."
+            "ALL job titles or role names relevant to this offer, INCLUDING the main job title itself "
+            "(the one used in the offer's title field) as well as any other equivalent or acceptable "
+            "titles mentioned in the text (e.g. if the offer says 'Data Engineer, Analytics Engineer "
+            "or BI Developer', list all three, including 'Data Engineer' even if it matches the main title)."
         )
     )
 
@@ -160,8 +192,10 @@ extract_skills = Extract(
     task=(
         "Extract the required skills needed for this offer. "
         "You can deduce it if it is implied but do not invent anything. "
-        "Job titles or role names mentioned in the text (e.g. 'Data Engineer', 'BI Developer') "
-        "are NOT skills,  list them separately in alternative_job_titles instead."
+        "In related_job_titles, include the offer's own job title AND any equivalent/related "
+        "role names mentioned in the text — this field should contain every relevant job title, "
+        "not just alternatives to it. "
+        "Job titles or role names mentioned in the text are NOT skills, they belong in related_job_titles."
     ),
     output_key='skills',
     schema=OfferSkills,

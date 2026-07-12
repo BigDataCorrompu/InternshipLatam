@@ -15,6 +15,7 @@ import os
 import sys
 sys.path.append("../ingestion/python/src")     
 from database import Database
+from LLMprovider import LLM
 from APIendpoint import GeoAPI  
 import reverse_geocoder
 from ddgs import DDGS
@@ -57,31 +58,31 @@ WEIGHTS = {
 }
 # =========================== LLM Defintion ===========================
 # LLM 
-class LLM:
-    def __init__(self, groq_key: str=None):
-        self._groq_key = groq_key or os.getenv("GROQ_APP_KEY")
-        # Need to pay if groq
-        self._enrichement = None
+# class LLM:
+#     def __init__(self, groq_key: str=None):
+#         self._groq_key = groq_key or os.getenv("GROQ_APP_KEY")
+#         # Need to pay if groq
+#         self._enrichement = None
 
-        self.llama3_smart = ChatGroq(model="llama-3.3-70b-versatile", api_key=self._groq_key, temperature=0)
-        self.llama4_smart = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self._groq_key, temperature=0)
-        # Problem of formatting with this model use an another one
-        # self.llm_fast  = ChatGroq(model="llama-3.1-8b-instant", api_key=self._groq_key, temperature=0)
+#         self.llama3_smart = ChatGroq(model="llama-3.3-70b-versatile", api_key=self._groq_key, temperature=0)
+#         self.llama4_smart = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self._groq_key, temperature=0)
+#         # Problem of formatting with this model use an another one
+#         # self.llm_fast  = ChatGroq(model="llama-3.1-8b-instant", api_key=self._groq_key, temperature=0)
     
-    @property
-    def enrichement(self):
-        # Vérification environnementale (ex: variable d'environnement sur le Cloud)
-        if os.getenv("STREAMLIT_RUNTIME") == "true": 
-             # Le Cloud n'a pas accès à Ollama local
-             raise RuntimeError("Ollama n'est pas disponible sur le Cloud.")
+#     @property
+#     def enrichement(self):
+#         # Vérification environnementale (ex: variable d'environnement sur le Cloud)
+#         if os.getenv("STREAMLIT_RUNTIME") == "true": 
+#              # Le Cloud n'a pas accès à Ollama local
+#              raise RuntimeError("Ollama n'est pas disponible sur le Cloud.")
 
-        if self._enrichement is None:
-            try:
-                from langchain_ollama import ChatOllama
-                self._enrichement = ChatOllama(model="llama3.2", temperature=0)
-            except ImportError:
-                print("Bibliothèque langchain-ollama non trouvée.")
-        return self._enrichement
+#         if self._enrichement is None:
+#             try:
+#                 from langchain_ollama import ChatOllama
+#                 self._enrichement = ChatOllama(model="llama3.2", temperature=0)
+#             except ImportError:
+#                 print("Bibliothèque langchain-ollama non trouvée.")
+#         return self._enrichement
 
         
 # =========================== STATE ===========================
@@ -109,7 +110,7 @@ class JobOfferState(TypedDict):
     # ── analytics.job_requirement ─────────────────────────────────
     seniority: str | None
     spoken_languages_required: Annotated[list[str], operator.add] | None
-    alternative_job_titles: Annotated[list[str], operator.add] | None
+    related_job_titles: Annotated[list[str], operator.add] | None
     skills_languages: Annotated[list[str], operator.add] | None
     skills_framework: Annotated[list[str], operator.add] | None
     skills_aptitudes: Annotated[list[str], operator.add] | None
@@ -184,7 +185,7 @@ def map_bronze_to_JobOfferState(row: dict) -> JobOfferState:
         # ── analytics.job_requirement ─────────────────────────────
         "seniority": None,
         "spoken_languages_required": [],
-        "alternative_job_titles": [],
+        "related_job_titles": [],
         "skills_languages": [],
         "skills_framework": [],
         "skills_aptitudes": [],
@@ -587,7 +588,7 @@ class DetermineRelevancy:
             f"country: {state.get('country')}",
             f"location_raw: {state.get('location_raw')}",
             f"company_name: {state.get('company_name')}",
-            f"alternative_job_titles: {state.get('alternative_job_titles')}",
+            f"related_job_titles: {state.get('related_job_titles')}",
             f"skills_languages: {state.get('skills_languages')}",
             f"skills_framework: {state.get('skills_framework')}",
             f"skills_aptitudes: {state.get('skills_aptitudes')}",
