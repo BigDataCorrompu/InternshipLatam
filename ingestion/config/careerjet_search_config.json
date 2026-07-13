@@ -1,17 +1,13 @@
 {
     "default_params": {
         "sort":          "date",
-        "page_size":     100,
-        "fragment_size": 300
+        "page": 5,
+        "page_size":     20,
+        "fragment_size": 150
     },
     "queries": [
         {"keywords": "data engineer",      "location": "Santiago",     "locale_code": "es_CL"},
         {"keywords": "data engineer",      "location": "Buenos Aires", "locale_code": "es_AR"},
-        {"keywords": "data engineer",      "location": "Montevideo",   "locale_code": "es_UY"},
-        {"keywords": "ingeniero de datos", "location": "Santiago",     "locale_code": "es_CL"},
-        {"keywords": "data scientist",     "location": "Buenos Aires", "locale_code": "es_AR"},
-        {"keywords": "data analyst",       "location": "Santiago",     "locale_code": "es_CL"},
-        {"keywords": "ETL developer",      "location": "Buenos Aires", "locale_code": "es_AR"},
-        {"keywords": "pipeline data",      "location": "Montevideo",   "locale_code": "es_UY"}
+        {"keywords": "data engineer",      "location": "Montevideo",   "locale_code": "es_UY"}
     ]
 }

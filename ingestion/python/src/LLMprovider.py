@@ -21,7 +21,7 @@ class LLM:
         Un seul endroit à changer pour switcher de provider partout dans le pipeline."""
         if self._enrichement is None:
             self._enrichement = ChatMistralAI(
-                model="mistral-small-latest", 
+                model="ministral-8b-2512", 
                 mistral_api_key=self._mistral_key,
                 temperature=0
             )

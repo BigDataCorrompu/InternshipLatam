@@ -6,6 +6,7 @@ from airflow.exceptions import AirflowSkipException
 from utils import write_json, load_json, save_to_landing_bucket
 from APIendpoint import JsearchAPI    
 from bucket import Bucket
+from datasets import B2_JSEARCH  
 
 from datetime import datetime
 from pathlib import Path
@@ -19,7 +20,7 @@ CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/opt/airflow/config"))
 
 # Parameter of frequency
 SCHEDULE_PERIOD = 3 # 3 days
-SCHEDULE = "0 7 */3 * *"
+SCHEDULE = "0 20 */3 * *"
 
 JOB_OFFER_TABLE = 'raw.job_offer'
 CONFIG = "jsearch_search_config"
@@ -93,7 +94,7 @@ def fetch_jsearch_pipeline():
     
 
     
-    @task(task_id="save_to_landing")
+    @task(task_id="save_to_landing", outlets=[B2_JSEARCH])
     def save_to_landing_task(file_path: str, ds=None) -> None:
         bucket = Bucket(
             key_id=Variable.get("KEY_ID"),

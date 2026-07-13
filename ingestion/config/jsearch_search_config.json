@@ -1,14 +1,11 @@
 {
     "default_params": {
         "num_pages": 3,
-        "date_posted": "month" 
+        "date_posted": "3days" 
     },
     "queries": [
         {"query": "data engineer", "country": "cl"},
         {"query": "data engineer", "country": "ar"},
-        {"query": "data engineer", "country": "uy"},
-        {"query": "ingeniero de datos", "country": "cl"},
-        {"query": "data scientist", "country": "ar"},
-        {"query": "data analyst", "country": "cl"}
+        {"query": "data engineer", "country": "uy"}
     ]
 }

@@ -6,6 +6,7 @@ from airflow.exceptions import AirflowSkipException
 from utils import write_json, load_json, save_to_landing_bucket
 from APIendpoint import CareerJetAPI  
 from bucket import Bucket
+from datasets import B2_CAREERJET  
 
 from datetime import datetime
 from pathlib import Path
@@ -14,17 +15,26 @@ import os
 logger = logging.getLogger(__name__)
 
 
+
+# *   *   *   *   *   /path/to/command
+# │   │   │   │   │
+# │   │   │   │   └─── Day of the week (0 - 6) (0 is Sunday, 1 is Monday, etc.)
+# │   │   │   └──────── Month of the year (1 - 12)
+# │   │   └───────────── Day of the month (1 - 31)
+# │   └────────────────── Hour of the day (0 - 23, in 24-hour format)
+# └────────────────────── Minute of the hour (0 - 59)
+
 # ___ CONSTANTS _______________________________________________________________
 RAW_PATH = Path(os.getenv('RAW_DATA_PATH', '/opt/airflow/raw'))
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/opt/airflow/config"))
 
 # PARAMETRE DE PEUPLEMENT
-MAX_PAGE_CAREERJET = 50
-MAX_DAYS_CAREERJET = 30
+MAX_PAGE_CAREERJET = 10
+MAX_DAYS_CAREERJET = 3
 
 # Parameter of frequency
-SCHEDULE_PERIOD = 3 # 3 days
-SCHEDULE = "0 6 */3 * *"
+SCHEDULE_PERIOD = 1 # 3 days
+SCHEDULE = "0 19 * * *"
 
 JOB_OFFER_TABLE = 'raw.job_offer'
 CONFIG = "careerjet_search_config"
@@ -97,7 +107,7 @@ def fetch_careerjet_pipeline():
         return str(file_path)
     
 
-    @task(task_id="save_to_landing")
+    @task(task_id="save_to_landing", outlets=[B2_CAREERJET])
     def save_to_landing_task(file_path: str, ds=None) -> None:
         bucket = Bucket(
             key_id=Variable.get("KEY_ID"),

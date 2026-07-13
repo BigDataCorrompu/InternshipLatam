@@ -131,14 +131,19 @@ class OfferAttribute(BaseModel):
     )
     spoken_languages_required: list[str] | None = Field(
         description=(
-            "Detect the speaking language in which the offer is written, "
-            "AND the required languages for this job offer mentionned in the offer."
-            "Strictly identify the human language required to speak/work in the position."
-            "CRITICAL: If no specific language requirement is explicitly mentioned in the text, "
-            "DEFAULT to the language in which the job offer is written (e.g., ['en'] if the text is in English)."
-            "EXCLUDE languages that are only used as 'tech keywords' (e.g., if a job is in Spanish but mentions 'English documentation', do NOT add 'en')."
-            "If the job description is written in one language and no other is required, return only the language of the description."
-            "CRITICAL: Return ONLY the ISO 639-1 codes (e.g., ['es'], ['fr'], ['pt']). Do NOT return the full language names."
+            "The HUMAN language(s) the candidate must speak to work in this position. "
+            "This is NOT the language the job ad is written in — job boards often translate or "
+            "rewrite ads, so the ad's language is unreliable.\n"
+            "Rules, in priority order:\n"
+            "1. If the offer EXPLICITLY states a language requirement (e.g. 'inglés avanzado', "
+            "'English required', 'bilingual'), return exactly those languages.\n"
+            "2. If NO explicit requirement is stated, infer from the job's country: "
+            "Latin America (Chile, Argentina, Uruguay, Mexico, Colombia...) → ['es']; Brazil → ['pt'].\n"
+            "3. EXCEPTION to rule 2: return ['en'] only if the ad explicitly signals an "
+            "English-speaking workplace — e.g. 'international team', 'English is our working language', "
+            "'global company, English required'. A mere mention of 'English documentation' or "
+            "English tech keywords is NOT such a signal.\n"
+            "Return ONLY ISO 639-1 codes (['es'], ['en'], ['pt']). Never full language names."
         )
     )
     @field_validator("is_remote", mode="before")
@@ -166,26 +171,36 @@ extract_attributes = Extract(
 
 # =========================== Skills handle ===========================
 class OfferSkills(BaseModel):
-    skills_languages: list[str] = Field(description="Programming language mentionned in the offer, e.g python, sql, terraform")
-    skills_framework: list[str] = Field(description="Framework mentionned in the offer, e.g airflow, AWS")
+    skills_languages: list[str] = Field(
+        description="Programming languages mentioned in the offer, e.g. Python, SQL, Terraform"
+    )
+    skills_framework: list[str] = Field(
+        description="Frameworks and tools mentioned in the offer, e.g. Airflow, AWS, BigQuery"
+    )
     skills_aptitudes: list[str] = Field(
         description=(
-            "Technical competencies or domain knowledge needed for this job, e.g "
+            "Technical competencies or domain knowledge needed for this job, e.g. "
             "cloud architecture, database management, data warehousing, ETL design. "
+            "MUST be written in English, even if the offer is in Spanish or Portuguese. "
             "Do NOT include job titles or role names (e.g. 'Data Engineer', 'Analytics Engineer', "
             "'BI Developer') — those belong to related_job_titles, not here."
         )
     )
-    skills_soft: list[str] = Field(description="Soft skills needed for this job, for example communication")
-    related_job_titles: list[str] = Field(
+    skills_soft: list[str] = Field(
         description=(
-            "ALL job titles or role names relevant to this offer, INCLUDING the main job title itself "
-            "(the one used in the offer's title field) as well as any other equivalent or acceptable "
-            "titles mentioned in the text (e.g. if the offer says 'Data Engineer, Analytics Engineer "
-            "or BI Developer', list all three, including 'Data Engineer' even if it matches the main title)."
+            "Soft skills needed for this job, e.g. communication, teamwork, problem-solving. "
+            "MUST be written in English, even if the offer is in Spanish or Portuguese."
         )
     )
-
+    related_job_titles: list[str] = Field(
+        description=(
+            "Job titles EXPLICITLY WRITTEN in the offer text: the main job title, plus any "
+            "equivalent titles the text itself lists as acceptable. "
+            "Do NOT add titles that are not literally present in the text — no suggestions, "
+            "no synonyms you think of, no adjacent roles. "
+            "Translate to English if the offer is in another language."
+        )
+    )
 
 extract_skills = Extract(
     llm=llm.enrichement,
@@ -195,13 +210,15 @@ extract_skills = Extract(
         "In related_job_titles, include the offer's own job title AND any equivalent/related "
         "role names mentioned in the text — this field should contain every relevant job title, "
         "not just alternatives to it. "
-        "Job titles or role names mentioned in the text are NOT skills, they belong in related_job_titles."
+        "Job titles or role names mentioned in the text are NOT skills, they belong in related_job_titles. "
+        "IMPORTANT: All extracted values MUST be written in English, even when the offer is written "
+        "in Spanish or French. Translate every skill, aptitude, soft skill and job title into English. "
+        "Keep proper nouns and technology names unchanged (Python, BigQuery, Apache Airflow, GCP)."
     ),
     output_key='skills',
     schema=OfferSkills,
     fields=['job_title', 'offer_description']
 )
-
 # =========================== Relevancy handle ===========================
 # profile = """
 # Etudiant ingénieur français

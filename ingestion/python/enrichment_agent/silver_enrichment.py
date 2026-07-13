@@ -30,20 +30,24 @@ def clean_location_raw(location_raw: str) -> str:
     cleaned = re.split(r'•|a través de|via|through', location_raw)[0]
     return cleaned.strip()
 
-# Grok rate limit handle
-def call_with_retry(fn, max_retries=20):
+# Mistrall
+def call_with_retry(fn, max_retries=8):
     for attempt in range(max_retries):
         try:
             return fn()
         except Exception as e:
-            error_str = str(e)
-            if "rate_limit_exceeded" in error_str:
-                match = re.search(r"try again in ([\d.]+)s", error_str)
-                wait_time = float(match.group(1)) + 1.0 if match else 8  # marge plus large
-                print(f"⏳ Rate limit atteint, attente de {wait_time:.1f}s avant retry ({attempt+1}/{max_retries})")
-                time.sleep(wait_time)
-            else:
+            msg = str(e).lower()
+            is_rate_limit = (
+                "rate_limit" in msg or "rate limit" in msg
+                or "429" in msg or "too many requests" in msg
+                or "capacity exceeded" in msg
+            )
+            if not is_rate_limit:
                 raise
+            match = re.search(r"try again in ([\d.]+)s", msg)
+            wait = float(match.group(1)) + 1.0 if match else min(2 ** attempt, 30)
+            print(f"⏳ Rate limit, attente {wait:.1f}s ({attempt+1}/{max_retries})")
+            time.sleep(wait)
     raise Exception("Trop de tentatives échouées")
 
 
@@ -505,7 +509,7 @@ class OfferRelevancy(BaseModel):
     )
     score_seniority: float | str | None = Field(
         description=(
-            "Seniority fit score from 0 to 10, comparing the seniority required by the offer against my "
+            "Seniority fit score from 0 to 10, comparing the seniority required by the offer against my profile "
             "10 = perfect match, 0 = requires a seniority level I don't have. "
             "If seniority is not specified or you can't deduce it, return null."
         )
