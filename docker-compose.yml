@@ -34,6 +34,7 @@ services:
       volumes:
         - ./requirements.txt:/requirements.txt
       entrypoint: /bin/bash
+      user: "${AIRFLOW_UID:-50000}:0"
       command: -c "
         pip install -r /requirements.txt &&
         airflow db migrate &&
@@ -92,6 +93,7 @@ services:
       - ./ingestion/logs:/opt/airflow/logs
       - ./ingestion/raw:/opt/airflow/raw
       - ./ingestion/config:/opt/airflow/config
+    user: "${AIRFLOW_UID:-50000}:0"
     command: scheduler
     build: . 
 
@@ -115,6 +117,7 @@ services:
       - ./ingestion/logs:/opt/airflow/logs
     ports:
       - "8080:8080"
+    user: "${AIRFLOW_UID:-50000}:0"
     command: webserver
     build: . 
 
