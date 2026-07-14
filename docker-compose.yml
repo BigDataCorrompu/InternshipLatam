@@ -83,7 +83,7 @@ services:
       AIRFLOW_VAR_SERVER_IP: ${SERVER_IP}
       # LLM __________________________________________________
       AIRFLOW_VAR_MISTRAL_API_KEY: ${MISTRAL_API_KEY}
-      AIRFLOW_VAR_GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      AIRFLOW_VAR_GEMINI_API_KEY: ${GOOGLE_API_KEY}
       AIRFLOW_VAR_MAPS_APP_KEY: ${MAPS_APP_KEY}
     volumes:
       - ./requirements.txt:/requirements.txt
