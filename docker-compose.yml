@@ -110,6 +110,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       PYTHONPATH: /opt/airflow/pipeline   # ← pointe vers python/src/
     volumes:
+      - ./requirements.txt:/requirements.txt
       - ./ingestion/airflow/dags:/opt/airflow/dags       # ← DAGs
       - ./ingestion/python/src:/opt/airflow/pipeline     # ← scripts Python
       - ./ingestion/logs:/opt/airflow/logs
