@@ -17,33 +17,33 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+      
   airflow-init:
-    image: apache/airflow:2.9.1
-    container_name: latam_airflow_init
-    restart: "no"
-    depends_on:
-      airflow-postgres:
-        condition: service_healthy
-      local-postgres:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    entrypoint: /bin/bash
-    command: -c "
-      pip install requests python-dotenv psycopg2-binary &&
-      airflow db migrate &&
-      airflow users create \
-        --username ${AIRFLOW_ADMIN_USERNAME} \
-        --password ${AIRFLOW_ADMIN_PASSWORD} \
-        --firstname Admin \
-        --lastname User \
-        --role Admin \
-        --email ${AIRFLOW_ADMIN_EMAIL}"
+      image: apache/airflow:2.9.1
+      container_name: latam_airflow_init
+      restart: "no"
+      depends_on:
+        airflow-postgres:
+          condition: service_healthy
+      env_file:
+        - .env
+      environment:
+        AIRFLOW__CORE__EXECUTOR: LocalExecutor
+        AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+        AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      volumes:
+        - ./requirements.txt:/requirements.txt
+      entrypoint: /bin/bash
+      command: -c "
+        pip install -r /requirements.txt &&
+        airflow db migrate &&
+        airflow users create \
+          --username ${AIRFLOW_ADMIN_USERNAME} \
+          --password ${AIRFLOW_ADMIN_PASSWORD} \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email ${AIRFLOW_ADMIN_EMAIL}"
 
   airflow-scheduler:
     image: apache/airflow:2.9.1
@@ -52,8 +52,6 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-      local-postgres:
-        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -62,7 +60,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__PARALLELISM: 4
       AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 4
-      PYTHONPATH: /opt/airflow/pipeline   # ← pointe vers python/src/
+      PYTHONPATH: /opt/airflow/pipeline
       AIRFLOW_VAR_RAW_DATA_PATH: ${RAW_DATA_PATH}
       # Variables Airflow auto-créées
       # Neon _________________________________________________
@@ -76,11 +74,6 @@ services:
       AIRFLOW_VAR_KEY_ID: ${KEY_ID}
       AIRFLOW_VAR_APPLICATION_KEY: ${APPLICATION_KEY}
       AIRFLOW_VAR_BUCKET_NAME: ${BUCKET_NAME}
-      # local postgres _______________________________________
-      AIRFLOW_VAR_LOCAL_DB_HOST: latam_local_postgres
-      AIRFLOW_VAR_LOCAL_DB_NAME: ${LOCAL_DB_NAME}
-      AIRFLOW_VAR_LOCAL_DB_USER: ${LOCAL_DB_USER}
-      AIRFLOW_VAR_LOCAL_DB_PASSWORD: ${LOCAL_DB_PASSWORD}
       # APIs _________________________________________________
       AIRFLOW_VAR_JSEARCH_APP_KEY: ${JSEARCH_APP_KEY}
       AIRFLOW_VAR_JSEARCH_APP_HOST: ${JSEARCH_APP_HOST}
@@ -88,13 +81,19 @@ services:
       AIRFLOW_VAR_CAREERJET_USER_AGENT: ${CAREERJET_USER_AGENT}
       AIRFLOW_VAR_CAREERJET_REFERER: ${CAREERJET_REFERER}
       AIRFLOW_VAR_SERVER_IP: ${SERVER_IP}
+      # LLM __________________________________________________
+      AIRFLOW_VAR_MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      AIRFLOW_VAR_GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      AIRFLOW_VAR_MAPS_APP_KEY: ${MAPS_APP_KEY}
     volumes:
-      - ./ingestion/airflow/dags:/opt/airflow/dags       # ← DAGs
-      - ./ingestion/python/src:/opt/airflow/pipeline     # ← scripts Python
+      - ./requirements.txt:/requirements.txt
+      - ./ingestion/airflow/dags:/opt/airflow/dags
+      - ./ingestion/python/src:/opt/airflow/pipeline
       - ./ingestion/logs:/opt/airflow/logs
       - ./ingestion/raw:/opt/airflow/raw
-      - ./ingestion/config:/opt/airflow/config   # config api requests
-    command: scheduler
+      - ./ingestion/config:/opt/airflow/config
+    entrypoint: /bin/bash
+    command: -c "pip install -r /requirements.txt && exec airflow scheduler"
 
   airflow-webserver:
     image: apache/airflow:2.9.1
