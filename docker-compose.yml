@@ -115,7 +115,8 @@ services:
       - ./ingestion/logs:/opt/airflow/logs
     ports:
       - "8080:8080"
-    command: webserver
+    entrypoint: /bin/bash
+    command: -c "pip install -r /requirements.txt && exec airflow webserver"
 
 
   # ========================================================================

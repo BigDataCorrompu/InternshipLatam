@@ -96,6 +96,8 @@ def fetch_jsearch_pipeline():
     
     @task(task_id="save_to_landing", outlets=[B2_JSEARCH])
     def save_to_landing_task(file_path: str, ds=None) -> None:
+        from utils import save_to_landing_bucket
+        from bucket import Bucket
         bucket = Bucket(
             key_id=Variable.get("KEY_ID"),
             app_key=Variable.get("APPLICATION_KEY"),
