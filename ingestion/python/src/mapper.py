@@ -114,12 +114,20 @@ class CareerjetMapper(JobMapper):
     def _findMetaData(self, raw: dict) -> dict:
         return raw.get("params", {})
     
+    def _make_id(self, data: dict) -> str:
+        key = "|".join([
+            (data.get("company") or "").strip().lower(),
+            (data.get("title") or "").strip().lower(),
+            (data.get("locations") or "").strip().lower(),
+        ])
+        return "cj_" + hashlib.md5(key.encode()).hexdigest()
+    
     def normalise(self, data: dict, metaData: dict) -> tuple:
         locale_code = metaData.get("locale_code", "")
         search_language, country = locale_code.split('_') if '_' in locale_code else (None, None)
 
         return JobOffer(
-            id_job            = "cj_" + hashlib.md5(data.get("url", "").encode()).hexdigest(),
+            id_job            = self._make_id(data),
             api_source        = self.source,
             job_title         = data.get("title") or None,
             contract_type     = None,                    # pas disponible Careerjet

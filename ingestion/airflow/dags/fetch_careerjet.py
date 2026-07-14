@@ -8,7 +8,7 @@ from APIendpoint import CareerJetAPI
 from bucket import Bucket
 from datasets import B2_CAREERJET  
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import logging
 import os
@@ -55,6 +55,8 @@ DATA_TYPE = "job_offer"
     tags = ["ingestion", "job_offer", "landing"],
     default_args={
         'owner': 'internship_latam',
+        'retries': 1,
+        'retry_delay': timedelta(minutes=30)
     }
 )
 def fetch_careerjet_pipeline():
