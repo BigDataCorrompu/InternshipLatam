@@ -44,6 +44,7 @@ services:
           --lastname User \
           --role Admin \
           --email ${AIRFLOW_ADMIN_EMAIL}"
+      build: . 
 
   airflow-scheduler:
     image: apache/airflow:2.9.1
@@ -92,6 +93,7 @@ services:
       - ./ingestion/raw:/opt/airflow/raw
       - ./ingestion/config:/opt/airflow/config
     command: scheduler
+    build: . 
 
   airflow-webserver:
     image: apache/airflow:2.9.1
@@ -114,6 +116,7 @@ services:
     ports:
       - "8080:8080"
     command: webserver
+    build: . 
 
 
 
