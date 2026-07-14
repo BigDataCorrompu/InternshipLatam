@@ -86,14 +86,12 @@ services:
       AIRFLOW_VAR_GEMINI_API_KEY: ${GEMINI_API_KEY}
       AIRFLOW_VAR_MAPS_APP_KEY: ${MAPS_APP_KEY}
     volumes:
-      - ./requirements.txt:/requirements.txt
       - ./ingestion/airflow/dags:/opt/airflow/dags
       - ./ingestion/python/src:/opt/airflow/pipeline
       - ./ingestion/logs:/opt/airflow/logs
       - ./ingestion/raw:/opt/airflow/raw
       - ./ingestion/config:/opt/airflow/config
-    entrypoint: /bin/bash
-    command: -c "pip install -r /requirements.txt && exec airflow scheduler"
+    command: scheduler
 
   airflow-webserver:
     image: apache/airflow:2.9.1
@@ -110,38 +108,16 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       PYTHONPATH: /opt/airflow/pipeline   # ← pointe vers python/src/
     volumes:
-      - ./requirements.txt:/requirements.txt
       - ./ingestion/airflow/dags:/opt/airflow/dags       # ← DAGs
       - ./ingestion/python/src:/opt/airflow/pipeline     # ← scripts Python
       - ./ingestion/logs:/opt/airflow/logs
     ports:
       - "8080:8080"
-    entrypoint: /bin/bash
-    command: -c "pip install -r /requirements.txt && exec airflow webserver"
+    command: webserver
 
 
-  # ========================================================================
-  # Local postgresql bdd 
-  # landing before bronze 
-  # staging before silver
-  # ========================================================================
-  local-postgres:
-      image: postgres:16-alpine
-      container_name: latam_local_postgres
-      restart: unless-stopped
-      environment:
-        POSTGRES_USER: ${LOCAL_DB_USER}
-        POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD}
-        POSTGRES_DB: ${LOCAL_DB_NAME}
-      volumes:
-        - /opt/latam/postgres_data:/var/lib/postgresql/data
-        - ./database/migration/004_init_enrichment_staging.sql:/docker-entrypoint-initdb.d/004_init_enrichment_staging.sql
-        - ./database/migration/005_init_raw_landing.sql:/docker-entrypoint-initdb.d/005_init_raw_landing.sql
-      healthcheck:
-        test: ["CMD-SHELL", "pg_isready -U ${LOCAL_DB_USER} -d ${LOCAL_DB_NAME}"]
-        interval: 10s
-        timeout: 5s
-        retries: 5
+
+
 
 
   
