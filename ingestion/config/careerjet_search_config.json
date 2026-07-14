@@ -1,9 +1,8 @@
 {
     "default_params": {
         "sort":          "date",
-        "page": 5,
         "page_size":     20,
-        "fragment_size": 150
+        "fragment_size": 1500
     },
     "queries": [
         {"keywords": "data engineer",      "location": "Santiago",     "locale_code": "es_CL"},

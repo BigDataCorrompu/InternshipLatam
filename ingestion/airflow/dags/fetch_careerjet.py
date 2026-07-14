@@ -30,7 +30,7 @@ CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/opt/airflow/config"))
 
 # PARAMETRE DE PEUPLEMENT
 MAX_PAGE_CAREERJET = 10
-MAX_DAYS_CAREERJET = 3
+MAX_DAYS_CAREERJET = 2
 
 # Parameter of frequency
 SCHEDULE_PERIOD = 1 # 3 days
