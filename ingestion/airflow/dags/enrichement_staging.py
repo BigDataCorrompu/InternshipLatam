@@ -4,7 +4,7 @@ from airflow.exceptions import AirflowSkipException
 
 from datasets import BRONZE_OFFERS, STAGING_ENRICHED
 from database import Database
-from LLMprovider import LLM
+
 
 from datetime import datetime
 import json
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 SAVE_EVERY = 10        # flush vers staging tous les N enrichissements
 MAX_PER_RUN = None     # None = tout ; un int pour lisser le rattrapage
 
-LLM_MODEL = llm.enrichement.model
+
 
 
 SELECT_PENDING = """
@@ -61,6 +61,9 @@ def silver_enrichment():
         # Au parsing du DAG (toutes les 30s), ça recréerait les clients pour rien.
         from graph_silver_enrichment import graph
         from silver_enrichment import map_bronze_to_JobOfferState, map_prompt_to_JobOfferState
+        from LLMprovider import LLM
+        llm = LLM() 
+        llm_model_name = llm.enrichement.model
 
         db = get_db()
 
@@ -103,7 +106,7 @@ def silver_enrichment():
                 state = map_bronze_to_JobOfferState(row) | profile_state
                 result = graph.invoke(state)
 
-                buffer.append((id_job, json.dumps(result, default=str), LLM_MODEL))
+                buffer.append((id_job, json.dumps(result, default=str), llm_model_name))
                 ok += 1
                 logger.info(f"[ENRICH] {i}/{len(pending)} id={id_job} score={result.get('score_relevancy')}")
 
