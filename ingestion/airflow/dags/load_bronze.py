@@ -7,7 +7,7 @@ from database import Database
 from bucket import Bucket
 from datasets import B2_JSEARCH, B2_CAREERJET, BRONZE_OFFERS
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import tempfile
 import logging
@@ -34,7 +34,12 @@ MAPPERS = {
     catchup=False,
     max_active_runs=1,
     tags=["ingestion", "bronze", "load"],
-    default_args={'owner': 'internship_latam'}
+    default_args={
+        'owner': 'internship_latam',
+        'retries': 2,
+        'retry_delay': timedelta(seconds=20)
+        
+        }
 )
 def load_to_bronze():
 
