@@ -239,12 +239,9 @@ class Extract:
 
     def __call__(self, state: JobOfferState) -> dict:
         # Define fields accesible in the state
-        context = "\n".join(
-            f"{field}: {state.get(field)}" for field in self._fields
-        )
+        context = "\n".join(f"{field}: {state.get(field)}" for field in self._fields)
 
-        # Structure the mission of the LLM with precision
-        system = SystemMessage(content=f"""
+        system_content = f"""
                             I did an ingestion pipeline gathering job offer via APIs, I did it to find an internship/job automatically.
                             I want you to be the more precise possible, this is important for me to have valuable and correct information.
                             Task : {self._task}
@@ -252,13 +249,17 @@ class Extract:
                             You MUST respond ONLY using the structured format provided, never write a conversational explanation.
                             If no data is found, return null or an empty list. Do not explain why, just do as the explained structure format
                             If no information is available, do not invent one: return null for single value fields, and an empty list [] for array/list fields.
-                        """)
+                        """
+        # Structure the mission of the LLM with precision
+        system = SystemMessage(
+            content=system_content,
+            additional_kwargs={"cache_control": {"type": "ephemeral"}}
+            )
         user = HumanMessage(content=context)
 
         try:
             response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
             data = response.model_dump()
-            print(f"DEBUG LLM RAW OUTPUT: {data}") # <--- REGARDEZ LA CONSOLE
             if len(data) == 1:
                 return {self._output_key: next(iter(data.values()))}
             return data

@@ -37,8 +37,7 @@ MAPPERS = {
     default_args={
         'owner': 'internship_latam',
         'retries': 2,
-        'retry_delay': timedelta(seconds=20)
-        
+        'retry_delay': timedelta(seconds=10) 
         }
 )
 def load_to_bronze():
