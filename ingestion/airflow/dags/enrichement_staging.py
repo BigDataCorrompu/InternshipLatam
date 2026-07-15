@@ -95,8 +95,6 @@ def silver_enrichment():
                 table="staging.enriched_offers",
                 columns=["id_offer", "raw_result", "llm_model"],
                 data=buffer,
-                onConflict="update",
-                conflict_columns=["id_offer"],
             )
             buffer = []
 
