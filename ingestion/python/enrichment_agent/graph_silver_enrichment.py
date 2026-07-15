@@ -321,3 +321,7 @@ builder.add_sequence([
     ("calculate_relevancy", calculate_relevancy)
 ])
 builder.add_edge("calculate_relevancy", END)
+
+
+
+graph = builder.compile()
