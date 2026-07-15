@@ -105,6 +105,7 @@ def save_to_landing_bucket(
         local_file: str,
         data_type: str, # job_offer, company_info ...
         ds: str,
+        ts_nodash: str,
     ) -> str:
     """
     Upload raw json file to b2 bucket using norm 'year/month/source/' + file_name
@@ -125,8 +126,8 @@ def save_to_landing_bucket(
     # Bucket path : data_type/year/month/api_source
     bucket_dir = f"{data_type}/{year}/{month}/{api_source}"
 
-    # File name : {ds}_{api_source}
-    file_name = f"{ds}_{api_source}"
+    # File name : {date}_{api_source}
+    file_name = f"{ts_nodash}_{api_source}"
 
     # Paths
     path_bucket = str((Path(bucket_dir) / file_name).with_suffix('.json'))

@@ -97,7 +97,7 @@ def fetch_jsearch_pipeline():
 
     
     @task(task_id="save_to_landing", outlets=[B2_JSEARCH])
-    def save_to_landing_task(file_path: str, ds=None) -> None:
+    def save_to_landing_task(file_path: str, ds=None, ts_nodash=None) -> None:
         from utils import save_to_landing_bucket
         from bucket import Bucket
         bucket = Bucket(
@@ -111,6 +111,7 @@ def fetch_jsearch_pipeline():
             local_file=file_path,
             data_type=DATA_TYPE,
             ds=ds,
+            ts_nodash=ts_nodash,
         )
 
         if file_data is None:

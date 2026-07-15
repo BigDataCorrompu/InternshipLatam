@@ -110,7 +110,7 @@ def fetch_careerjet_pipeline():
     
 
     @task(task_id="save_to_landing", outlets=[B2_CAREERJET])
-    def save_to_landing_task(file_path: str, ds=None) -> None:
+    def save_to_landing_task(file_path: str, ds=None, ts_nodash=None) -> None:
         bucket = Bucket(
             key_id=Variable.get("KEY_ID"),
             app_key=Variable.get("APPLICATION_KEY"),
@@ -122,6 +122,7 @@ def fetch_careerjet_pipeline():
             local_file=file_path,
             data_type=DATA_TYPE,
             ds=ds,
+            ts_nodash=ts_nodash,
         )
 
         if file_data is None:
