@@ -5,7 +5,7 @@ from airflow.exceptions import AirflowSkipException
 from mapper import JsearchMapper, CareerjetMapper
 from database import Database
 from bucket import Bucket
-from datasets import B2_JSEARCH, B2_CAREERJET, BRONZE_OFFERS
+from datasets import B2_RAW, BRONZE_OFFERS
 
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -30,7 +30,7 @@ MAPPERS = {
 @dag(
     dag_id='load_to_bronze',
     start_date=datetime(2026, 6, 7),
-    schedule=[B2_JSEARCH, B2_CAREERJET],
+    schedule=[B2_RAW],
     catchup=False,
     max_active_runs=1,
     tags=["ingestion", "bronze", "load"],
@@ -43,7 +43,7 @@ MAPPERS = {
 def load_to_bronze():
 
     for source in SOURCES:
-        @task(task_id=f"load_{source}")
+        @task(task_id=f"load_{source}", outlets=[BRONZE_OFFERS])
         def load(source=source):
             _load_source(source)
         load()

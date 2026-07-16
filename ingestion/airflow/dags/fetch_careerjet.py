@@ -6,7 +6,7 @@ from airflow.exceptions import AirflowSkipException
 from utils import write_json, load_json, save_to_landing_bucket
 from APIendpoint import CareerJetAPI  
 from bucket import Bucket
-from datasets import B2_CAREERJET  
+from datasets import B2_RAW  
 
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -109,7 +109,7 @@ def fetch_careerjet_pipeline():
         return str(file_path)
     
 
-    @task(task_id="save_to_landing", outlets=[B2_CAREERJET])
+    @task(task_id="save_to_landing", outlets=[B2_RAW])
     def save_to_landing_task(file_path: str, ds=None, ts_nodash=None) -> None:
         bucket = Bucket(
             key_id=Variable.get("KEY_ID"),

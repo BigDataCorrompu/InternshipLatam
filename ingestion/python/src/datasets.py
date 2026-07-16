@@ -7,8 +7,7 @@ Airflow chain scheduler
 
 
 # Zone raw B2 — produite par les fetchs
-B2_JSEARCH   = Dataset("b2://job_offer/jsearch")
-B2_CAREERJET = Dataset("b2://job_offer/careerjet")
+B2_RAW = Dataset("b2://job_offer") 
 
 # Bronze Neon — produit par load_to_bronze
 BRONZE_OFFERS = Dataset("neon://raw.job_offer")

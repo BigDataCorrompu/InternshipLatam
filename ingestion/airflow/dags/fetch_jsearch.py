@@ -6,7 +6,7 @@ from airflow.exceptions import AirflowSkipException
 from utils import write_json, load_json, save_to_landing_bucket
 from APIendpoint import JsearchAPI    
 from bucket import Bucket
-from datasets import B2_JSEARCH  
+from datasets import B2_RAW  
 
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -96,7 +96,7 @@ def fetch_jsearch_pipeline():
     
 
     
-    @task(task_id="save_to_landing", outlets=[B2_JSEARCH])
+    @task(task_id="save_to_landing", outlets=[B2_RAW])
     def save_to_landing_task(file_path: str, ds=None, ts_nodash=None) -> None:
         from utils import save_to_landing_bucket
         from bucket import Bucket
