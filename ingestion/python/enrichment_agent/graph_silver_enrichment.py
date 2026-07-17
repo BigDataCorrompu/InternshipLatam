@@ -93,7 +93,7 @@ find_mails = FindMails(llm=llm)
 
 # =========================== Attributes handle ===========================
 class OfferAttribute(BaseModel):
-    seniority: Literal["junior", "mid", "senior", "unknown"] = Field(
+    seniority: Literal["intern", "junior", "mid", "senior", "unknown"] = Field(
         description=(
             "Seniority level required for the position. "
             "ALWAYS try to infer it, even if not explicitly stated: "
@@ -106,7 +106,7 @@ class OfferAttribute(BaseModel):
             "The offer can be in any language."
         )
     )
-    is_remote: bool | str = Field(
+    is_remote: bool = Field(
         description=(
             "True if the job is fully or partially remote, False if on-site only. "
             "Infer from keywords like 'remoto', 'remote', 'teletrabajo', 'hybrid', 'presencial'. "
@@ -149,6 +149,8 @@ class OfferAttribute(BaseModel):
     @field_validator("is_remote", mode="before")
     @classmethod
     def normalize_remote(cls, v):
+        if v is None:
+            return False
         if isinstance(v, str):
             return v.strip().lower() in ("true", "1", "yes", "vrai")
         return v
@@ -194,13 +196,14 @@ class OfferSkills(BaseModel):
     )
     related_job_titles: list[str] = Field(
         description=(
-            "Job titles EXPLICITLY WRITTEN in the offer text: the main job title, plus any "
-            "equivalent titles the text itself lists as acceptable. "
-            "Do NOT add titles that are not literally present in the text — no suggestions, "
-            "no synonyms you think of, no adjacent roles. "
-            "Translate to English if the offer is in another language."
+            "MANDATORY, NEVER LEAVE EMPTY: this list MUST contain at least the offer's own "
+            "main job title (given to you in the job_title field), copied exactly as provided. "
+            "Additionally include any other equivalent job titles explicitly written in the offer text "
+            "(e.g. 'Data Engineer, Analytics Engineer or BI Developer' → list all three). "
+            "Do NOT invent titles that aren't in the text, but DO always copy the main job_title in."
         )
     )
+
 
 extract_skills = Extract(
     llm=llm.enrichement,
