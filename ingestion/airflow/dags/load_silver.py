@@ -14,15 +14,7 @@ logger = logging.getLogger(__name__)
 SQL_DIR = "/opt/airflow/pipeline/sql/staging_to_silver/"
 
 
-@dag(
-    dag_id='staging_to_silver',
-    start_date=datetime(2026, 6, 7),
-    schedule=[STAGING_ENRICHED],
-    catchup=False,
-    max_active_runs=1,
-    tags=["silver", "load", "analytics"],
-    default_args={'owner': 'internship_latam', 'retries': 1},
-)
+
 @task(task_id="transfer", outlets=[SILVER_ANALYTICS])
 def transfer():
     db = Database(
@@ -61,3 +53,19 @@ def transfer():
         logger.info(f"[SILVER] {sql_file.name} completed successfully")
 
     logger.info(f"[SILVER] Transferred {pending[0]['n']} records successfully.")
+
+
+
+@dag(
+    dag_id='staging_to_silver',
+    start_date=datetime(2026, 6, 7),
+    schedule=[STAGING_ENRICHED],
+    catchup=False,
+    max_active_runs=1,
+    tags=["silver", "load", "analytics"],
+    default_args={'owner': 'internship_latam', 'retries': 1},
+)
+def staging_to_silver():
+    transfer()
+
+staging_to_silver()
