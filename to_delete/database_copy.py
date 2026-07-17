@@ -1,10 +1,12 @@
-import os
-import logging
+import os 
 import requests
 import psycopg2
 import psycopg2.extras
-from typing import Literal
+from dotenv import load_dotenv
+import logging
+from typing import Literal, Any
 
+load_dotenv()
 log = logging.getLogger(__name__)
 
 class Database:
@@ -16,7 +18,7 @@ class Database:
         db_password:        str = None,
         db_sslmode:         str = None,
         db_channelbinding:  str = None, 
-        mode: Literal['http', 'psycopg2'] = 'psycopg2', # 🔄 Changé en psycopg2 par défaut
+        mode: Literal['http', 'psycopg2'] = 'http',
     ):
         self.db_host           = db_host           or os.getenv('DB_HOST')
         self.db_name           = db_name           or os.getenv('DB_NAME')
@@ -35,11 +37,14 @@ class Database:
             f"?sslmode={self.db_sslmode}&channel_binding={self.db_channelbinding}"
         )
 
-    def execute(self, query: str, params: list = None) -> list:
+
+    def execute(self, query:str, params: list = None) -> list:
+        """ PERMET DE GERER UNE BDD LOCAL OU CLOUD (Actuellement uniquement cloud)"""
         if self.mode == "http":
             return self._execute_http(query, params)
         return self._execute_psycopg2(query, params)
     
+
     def _execute_psycopg2(self, query: str, params: list = None) -> list:
         conn = psycopg2.connect(
             host=self.db_host,
@@ -59,12 +64,15 @@ class Database:
             conn.close()
 
     def _execute_http(self, query: str, params: list = None) -> list:
+        """Connexion via HTTP API Neon (port 443)."""
         try:
             url = f"https://{self.db_host}/sql"
             headers = {
                 "Content-Type": "application/json",
                 "Neon-Connection-String": self.database_url
             }
+
+            # ✅ params envoyés séparément dans le payload, jamais interpolés
             payload = {"query": query}
             if params:
                 payload["params"] = params
@@ -79,103 +87,70 @@ class Database:
             rows = data.get("rows", [])
             log.info(f"✅ Query OK ({len(rows)} lignes)")
             return rows
+
         except Exception as e:
             log.error(f"❌ HTTP Error : {e}")
             raise
      
     def bulk_insert(self, table, columns, data, batch_size=200,
                     onConflict=None, conflict_columns=None, returning=None):
-        if not data:
-            return []
-
-        if self.mode == "psycopg2":
-            return self._bulk_insert_psycopg2(table, columns, data, batch_size, onConflict, conflict_columns, returning)
-        
-        # Conserve l'ancien comportement exact si le mode est HTTP
         total = len(data)
         inserted = 0
         all_returned_rows = []
+
         conflict_clause = self._build_conflict_clause(onConflict, conflict_columns, columns)
         cols = ", ".join(f'"{c}"' for c in columns)
-        returning_clause = f" RETURNING {', '.join(f'"{c}"' for c in returning)}" if returning else ""
 
-        if '.' in table:
-            schema, tbl = table.split('.', 1)
-            table_sql = f'"{schema}"."{tbl}"'
-        else:
-            table_sql = f'"{table}"'
+        returning_clause = ""
+        if returning:
+            returning_cols = ", ".join(f'"{c}"' for c in returning)
+            returning_clause = f" RETURNING {returning_cols}"
 
         for i in range(0, total, batch_size):
             chunk = data[i:i + batch_size]
+            # FIX bug 3 — placeholder selon le mode
             rows_placeholders = ", ".join(
-                f"({ ', '.join(f'${r * len(columns) + j + 1}' for j in range(len(columns))) })"
+                f"({ ', '.join(self._placeholder(r * len(columns) + j + 1) for j in range(len(columns))) })"
                 for r, _ in enumerate(chunk)
             )
+
+            if '.' in table:
+                schema, tbl = table.split('.', 1)
+                table_sql = f'"{schema}"."{tbl}"'
+            else:
+                table_sql = f'"{table}"'
+
             query = f'INSERT INTO {table_sql} ({cols}) VALUES {rows_placeholders} {conflict_clause}{returning_clause};'
+
             params = [None if v is None else v for row in chunk for v in row]
-            result = self._execute_http(query, params)
+            result = self.execute(query, params)
+
             if returning and result:
                 all_returned_rows.extend(result)
+
             inserted += len(chunk)
             log.info(f"✅ Batch {i // batch_size + 1} OK ({inserted}/{total} lignes)")
+
+        log.info(f"✅ Bulk insert terminé ({total} lignes)")
         return all_returned_rows if returning else None
 
-    def _bulk_insert_psycopg2(self, table, columns, data, batch_size, onConflict, conflict_columns, returning):
-        """Version optimisée native pour psycopg2 ouvrant une SEULE connexion."""
-        all_returned_rows = []
-        conflict_clause = self._build_conflict_clause(onConflict, conflict_columns, columns)
-        cols = ", ".join(f'"{c}"' for c in columns)
-        returning_clause = f" RETURNING {', '.join(f'"{c}"' for c in returning)}" if returning else ""
-
-        if '.' in table:
-            schema, tbl = table.split('.', 1)
-            table_sql = f'"{schema}"."{tbl}"'
-        else:
-            table_sql = f'"{table}"'
-
-        # Le template pour execute_values DOIT utiliser %s pour chaque colonne d'une ligne
-        template = f"({', '.join(['%s'] * len(columns))})"
-        
-        # On construit la requête de base sans les valeurs (gérées par le module)
-        query = f'INSERT INTO {table_sql} ({cols}) VALUES %s {conflict_clause}{returning_clause};'
-
-        conn = psycopg2.connect(
-            host=self.db_host,
-            dbname=self.db_name,
-            user=self.db_user,
-            password=self.db_password,
-            sslmode=self.db_sslmode,
-        )
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                for i in range(0, len(data), batch_size):
-                    chunk = data[i:i + batch_size]
-                    
-                    # Utilisation de la méthode ultra-rapide et sécurisée de psycopg2
-                    psycopg2.extras.execute_values(
-                        cur, query, chunk, template=template, page_size=batch_size
-                    )
-                    
-                    if returning:
-                        all_returned_rows.extend([dict(r) for r in cur.fetchall()])
-                        
-                conn.commit()
-                log.info(f"✅ Bulk insert psycopg2 OK ({len(data)} lignes)")
-        finally:
-            conn.close()
-            
-        return all_returned_rows if returning else None
+    def _placeholder(self, index: int) -> str:
+        return f"${index}" if self.mode == "http" else "%s"
 
     def _build_conflict_clause(self, on_conflict, conflict_columns, columns) -> str:
         if not conflict_columns or on_conflict is None:
             return ""
+        
         conflict_cols = ", ".join(f'"{c}"' for c in conflict_columns)
+        
         if on_conflict == "nothing":
             return f"ON CONFLICT ({conflict_cols}) DO NOTHING"
+        
+        # UPDATE — met à jour toutes les colonnes sauf celles de conflict
         update_cols = [c for c in columns if c not in conflict_columns]
         updates = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in update_cols)
         return f"ON CONFLICT ({conflict_cols}) DO UPDATE SET {updates}"
-
+    
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
