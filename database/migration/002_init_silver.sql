@@ -75,7 +75,7 @@ CREATE TABLE analytics.job_offer (
     is_remote           BOOLEAN,
     job_publisher       VARCHAR(100),
     location_raw        VARCHAR(100),
-    offer_url           VARCHAR(500)    NOT NULL,
+    offer_url           VARCHAR(500),
     source_platform     VARCHAR(100),
     published_at        TIMESTAMPTZ,
     collected_at         TIMESTAMPTZ     DEFAULT NOW(),
@@ -91,7 +91,6 @@ DROP TABLE IF EXISTS analytics.job_requirement CASCADE;
 CREATE TABLE analytics.job_requirement (
     id              SERIAL          PRIMARY KEY,
     id_offer        VARCHAR(50)     NOT NULL REFERENCES analytics.job_offer(id_offer),
-    id_prompt               INT             REFERENCES analytics.prompt_relevancy(id_prompt),
     alternative_job_titles  TEXT[],
     offer_languages         TEXT[],
     seniority               VARCHAR(20),
@@ -104,21 +103,10 @@ CREATE TABLE analytics.job_requirement (
     UNIQUE (id_offer)                   -- ajouté : nécessaire pour ON CONFLICT (id_offer)
 );
 
--- ============================================================
--- 6. prompt_relevancy — versionnement des prompts de scoring
--- ============================================================
-DROP TABLE IF EXISTS analytics.prompt_relevancy CASCADE;
-
-CREATE TABLE analytics.prompt_relevancy (
-    id_prompt       SERIAL          PRIMARY KEY,
-    id_user         VARCHAR         NOT NULL DEFAULT 'default',
-    prompt          TEXT            NOT NULL,
-    created_at      TIMESTAMPTZ     DEFAULT NOW()
-);
 
 
 -- ============================================================
--- 7. job_relevancy — append only, scores dimensionnels par prompt
+-- 6. job_relevancy — append only, scores dimensionnels par prompt
 -- ============================================================
 DROP TABLE IF EXISTS analytics.job_relevancy CASCADE;
 
@@ -139,6 +127,19 @@ CREATE TABLE analytics.job_relevancy (
 
     UNIQUE (id_offer)                   -- ajouté : nécessaire pour ON CONFLICT (id_offer)
 );
+
+-- ============================================================
+-- 7. prompt_relevancy — versionnement des prompts de scoring
+-- ============================================================
+DROP TABLE IF EXISTS analytics.prompt_relevancy CASCADE;
+
+CREATE TABLE analytics.prompt_relevancy (
+    id_prompt       SERIAL          PRIMARY KEY,
+    id_user         VARCHAR         NOT NULL DEFAULT 'default',
+    prompt          TEXT            NOT NULL,
+    created_at      TIMESTAMPTZ     DEFAULT NOW()
+);
+
 
 -- ============================================================
 -- Index : To lookup fast into database to match an offer with an already registered company

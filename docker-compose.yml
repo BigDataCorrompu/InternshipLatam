@@ -90,6 +90,7 @@ services:
       - ./ingestion/airflow/dags:/opt/airflow/dags
       - ./ingestion/python/src:/opt/airflow/pipeline
       - ./ingestion/python/enrichment_agent:/opt/airflow/agent
+      - ./database/sql/staging_to_silver:/opt/airflow/pipeline/sql/staging_to_silver/
       - ./ingestion/logs:/opt/airflow/logs
       - ./ingestion/raw:/opt/airflow/raw
       - ./ingestion/config:/opt/airflow/config
@@ -113,6 +114,7 @@ services:
     volumes:
       - ./ingestion/airflow/dags:/opt/airflow/dags       # ← DAGs
       - ./ingestion/python/src:/opt/airflow/pipeline     # ← scripts Python
+      - ./database/sql/staging_to_silver:/opt/airflow/pipeline/sql/staging_to_silver/  # ← scripts SQL
       - ./ingestion/logs:/opt/airflow/logs
     ports:
       - "8080:8080"
