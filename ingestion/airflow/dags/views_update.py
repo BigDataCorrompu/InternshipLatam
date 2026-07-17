@@ -4,7 +4,7 @@ from airflow.utils.trigger_rule import TriggerRule
 from airflow.exceptions import AirflowSkipException
 
 from database import Database
-
+from datasets import SILVER_OFFERS, GOLD_OFFERS
 from datetime import datetime
 import logging
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ GOLD_JOB_OFFER = 'SELECT serving.refresh_job_offer_if_stale();'
 @dag(
     dag_id='update_views',
     start_date=datetime(2026, 6, 7), 
-    schedule=SCHEDULE,
+    schedule=[SILVER_OFFERS],
     catchup=False,
     max_active_runs=1,
     tags = ["ingestion", "job_offer", "landing"],
@@ -27,7 +27,7 @@ GOLD_JOB_OFFER = 'SELECT serving.refresh_job_offer_if_stale();'
 )
 def update_views():
 
-    @task
+    @task(task_id="update_view_offer", outlets=[GOLD_OFFERS])
     def gold_job_offer_task():
         db = Database(
             db_host           = Variable.get("DB_HOST"),

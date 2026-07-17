@@ -6,7 +6,7 @@ from pathlib import Path
 import logging
 
 from database import Database
-from datasets import STAGING_ENRICHED, SILVER_ANALYTICS
+from datasets import STAGING_ENRICHED, SILVER_OFFERS
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ SQL_DIR = "/opt/airflow/pipeline/sql/staging_to_silver/"
 
 
 
-@task(task_id="transfer", outlets=[SILVER_ANALYTICS])
+@task(task_id="transfer", outlets=[SILVER_OFFERS])
 def transfer():
     db = Database(
         db_host           = Variable.get("DB_HOST"),
