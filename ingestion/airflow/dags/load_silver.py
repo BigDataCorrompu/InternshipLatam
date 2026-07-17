@@ -1,4 +1,4 @@
-from airflow.decorators import task
+from airflow.decorators import task, dag
 from airflow.models import Variable
 from airflow.exceptions import AirflowSkipException
 from datetime import datetime
