@@ -1,17 +1,28 @@
 from airflow.decorators import task
 from airflow.models import Variable
 from airflow.exceptions import AirflowSkipException
+from datetime import datetime
 from pathlib import Path
 import logging
 
 from database import Database
-from datasets import SILVER_ANALYTICS
+from datasets import STAGING_ENRICHED, SILVER_ANALYTICS
 
 logger = logging.getLogger(__name__)
 
 # Dossier contenant tes 6 fichiers SQL nettoyés
 SQL_DIR = "/opt/airflow/pipeline/sql/staging_to_silver/"
 
+
+@dag(
+    dag_id='staging_to_silver',
+    start_date=datetime(2026, 6, 7),
+    schedule=[STAGING_ENRICHED],
+    catchup=False,
+    max_active_runs=1,
+    tags=["silver", "load", "analytics"],
+    default_args={'owner': 'internship_latam', 'retries': 1},
+)
 @task(task_id="transfer", outlets=[SILVER_ANALYTICS])
 def transfer():
     db = Database(
