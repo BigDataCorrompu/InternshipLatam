@@ -4,12 +4,12 @@ INSERT INTO analytics.job_requirement
 SELECT
     o.id_offer,
     LEFT(s.raw_result->>'seniority', 20),
-    ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'spoken_languages_required')),
-    ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'skills_languages')),
-    ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'skills_framework')),
-    ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'skills_aptitudes')),
-    ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'skills_soft')),
-    ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'related_job_titles'))
+    ARRAY(SELECT jsonb_array_elements_text(public.ensure_jsonb_array(s.raw_result->'spoken_languages_required'))),
+    ARRAY(SELECT jsonb_array_elements_text(public.ensure_jsonb_array(s.raw_result->'skills_languages'))),
+    ARRAY(SELECT jsonb_array_elements_text(public.ensure_jsonb_array(s.raw_result->'skills_framework'))),
+    ARRAY(SELECT jsonb_array_elements_text(public.ensure_jsonb_array(s.raw_result->'skills_aptitudes'))),
+    ARRAY(SELECT jsonb_array_elements_text(public.ensure_jsonb_array(s.raw_result->'skills_soft'))),
+    ARRAY(SELECT jsonb_array_elements_text(public.ensure_jsonb_array(s.raw_result->'related_job_titles')))
 FROM staging.enriched_offers s
 JOIN analytics.job_offer o ON o.id_offer = s.id_offer
 ON CONFLICT (id_offer) DO UPDATE SET
