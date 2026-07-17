@@ -9,7 +9,7 @@ SELECT
     ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'skills_framework')),
     ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'skills_aptitudes')),
     ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'skills_soft')),
-    ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'related_job_titles')),
+    ARRAY(SELECT jsonb_array_elements_text(s.raw_result->'related_job_titles'))
 FROM staging.enriched_offers s
 JOIN analytics.job_offer o ON o.id_offer = s.id_offer
 ON CONFLICT (id_offer) DO UPDATE SET
