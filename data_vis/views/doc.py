@@ -3,7 +3,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DOCS_ORDER = {
     "👋 Exemple Prompt to use": "StreamlitPrompt.md",
@@ -19,7 +19,7 @@ DOCS_ORDER = {
 }
 
 def load_markdown(filename):
-    file_path = PROJECT_ROOT / filename
+    file_path = PROJECT_ROOT / "docs" / filename
     if file_path.exists():
         with open(file_path, "r", encoding="utf-8") as f:
             return f.read()

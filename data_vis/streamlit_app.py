@@ -2,11 +2,12 @@ import sys
 from pathlib import Path
 
 CURRENT_DIR = Path(__file__).parent
-PROJECT_ROOT = CURRENT_DIR.parent  # remonte de data_vis/ vers la racine du repo
+PROJECT_ROOT = Path(__file__).resolve().parents[2]  # au lieu de parents[4]
 SRC_DIR = PROJECT_ROOT / "ingestion" / "python" / "src"
+DOC_DIR = PROJECT_ROOT / "docs"
 
 sys.path.insert(0, str(SRC_DIR))
-
+sys.path.insert(0, str(DOC_DIR))
 import streamlit as st
 
 dashboard_path = CURRENT_DIR / "views" / "dashboard.py"
