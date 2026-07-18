@@ -325,8 +325,9 @@ class FindLocation:
         phone number of the office 
         adress of the company
     """
-    def __init__(self, geo_api: GeoAPI):
+    def __init__(self, geo_api: GeoAPI, company_name_threshold: float=25):
         self._geo_api = geo_api
+        self._threshold = company_name_threshold
 
     def __call__(self, state: JobOfferState) -> dict:
         company = state.get('company_name')
@@ -344,6 +345,19 @@ class FindLocation:
         if not result:
             print(f"⚠️  find_location: aucun résultat pour {company} @ {location}")
             return {"_location_failed": True}
+        
+        # Compare le nom original avec celui retourné par Google Places
+        google_name = result.get("company_name")
+        if google_name:
+            score = fuzz.WRatio(company, google_name)
+            if score >= self._threshold:
+                # Assez similaire → on garde le nom Google Places (plus normalisé/officiel)
+                pass  # ne rien faire, result["company_name"] reste tel quel
+            else:
+                # Trop différent → probablement un faux positif Google Places, garde l'original
+                result["company_name"] = company
+        else:
+            result["company_name"] = company
         
         result["location_raw"] = location  # overwrite with the cleaned value
         

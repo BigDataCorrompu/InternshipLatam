@@ -1,32 +1,25 @@
-import streamlit as st
+import sys
 from pathlib import Path
 
-# 1. On récupère le dossier exact où se trouve streamlit_app.py
 CURRENT_DIR = Path(__file__).parent
+PROJECT_ROOT = CURRENT_DIR.parent  # remonte de data_vis/ vers la racine du repo
+SRC_DIR = PROJECT_ROOT / "ingestion" / "python" / "src"
 
-# 2. On construit les chemins absolus vers tes pages
+sys.path.insert(0, str(SRC_DIR))
+
+import streamlit as st
+
 dashboard_path = CURRENT_DIR / "views" / "dashboard.py"
 doc_path = CURRENT_DIR / "views" / "doc.py"
-# Doit être la TOUTE PREMIÈRE ligne de code Streamlit
+
 st.set_page_config(
     page_title="InternshipLatam Dashboard",
-    layout="wide", # C'est ça qui va étirer l'affichage
+    layout="wide",
     initial_sidebar_state="expanded"
 )
-# 3. Définition des pages (on convertit en chaîne de caractères avec str())
-dashboard_page = st.Page(
-    page=str(dashboard_path), 
-    title="Dashboard", 
-    icon="📊", 
-    default=True
-)
 
-doc_page = st.Page(
-    page=str(doc_path), 
-    title="Documentation (README)", 
-    icon="📝"
-)
+dashboard_page = st.Page(page=str(dashboard_path), title="Dashboard", icon="📊", default=True)
+doc_page = st.Page(page=str(doc_path), title="Documentation (README)", icon="📝")
 
-# Le reste de ton code de navigation reste identique
 pg = st.navigation([dashboard_page, doc_page])
 pg.run()

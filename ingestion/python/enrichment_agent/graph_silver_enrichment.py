@@ -131,19 +131,14 @@ class OfferAttribute(BaseModel):
     )
     spoken_languages_required: list[str] | None = Field(
         description=(
-            "The HUMAN language(s) the candidate must speak to work in this position. "
-            "This is NOT the language the job ad is written in — job boards often translate or "
-            "rewrite ads, so the ad's language is unreliable.\n"
-            "Rules, in priority order:\n"
-            "1. If the offer EXPLICITLY states a language requirement (e.g. 'inglés avanzado', "
-            "'English required', 'bilingual'), return exactly those languages.\n"
-            "2. If NO explicit requirement is stated, infer from the job's country: "
-            "Latin America (Chile, Argentina, Uruguay, Mexico, Colombia...) → ['es']; Brazil → ['pt'].\n"
-            "3. EXCEPTION to rule 2: return ['en'] only if the ad explicitly signals an "
-            "English-speaking workplace — e.g. 'international team', 'English is our working language', "
-            "'global company, English required'. A mere mention of 'English documentation' or "
-            "English tech keywords is NOT such a signal.\n"
-            "Return ONLY ISO 639-1 codes (['es'], ['en'], ['pt']). Never full language names."
+            "STEP 1: Identify the actual language of the TEXT PROVIDED TO YOU (job_title + offer_description) — "
+            "base this ONLY on the words actually present in the text, never on assumptions about the country "
+            "or company. "
+            "STEP 2: If the text explicitly requires additional languages beyond its own (e.g. 'must speak Portuguese'), "
+            "add those too. "
+            "STEP 3: If nothing else is required, return ONLY the language identified in STEP 1. "
+            "EXCLUDE languages mentioned only as tech keywords (e.g. 'English documentation' in a Spanish text). "
+            "Return ONLY ISO 639-1 codes."
         )
     )
     @field_validator("is_remote", mode="before")

@@ -465,106 +465,104 @@ def group_small_categories(counts: pd.Series, threshold_pct: float = 0.01, other
 # ══════════════════════════════════════════════════════════════════
 # Offers table
 # ══════════════════════════════════════════════════════════════════
-def render_offers_table(d: pd.DataFrame, selected_job_ids: list | None = None) -> None:
+def render_offers_table(d: pd.DataFrame) -> None:
     if d.empty:
-        st.subheader("📋 Offers")
-        st.info("No offers to display.")
         return
-
-    table_source = d
-    if selected_job_ids:
-        table_source = d[d.index.isin(selected_job_ids)]
-        st.caption(f"📍 Showing {len(table_source)} offer(s) at the selected location(s).")
-
-    show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
-                              "seniority", "score_relevancy"] if c in table_source.columns]
+    show_cols = [c for c in ["job_title", "company_name", "city", "country",
+                             "seniority", "score_relevancy"] if c in d.columns]
     st.subheader("📋 Offers")
-    st.dataframe(table_source[show_cols], hide_index=True, width="stretch")
+    st.dataframe(d[show_cols], hide_index=True, width="stretch")
+
 
 
 
 def build_dashboard(d: pd.DataFrame) -> None:
+
     # ── Metric ───────────────────────────────────────────────────
     st.metric("📦 Offers currently displayed", len(d))
 
-    # ── Map (Plotly, clickable, stacked by location) ────────────────
-    selected_job_ids = None
-
+    # ── Map ───────────────────────────────────────────────────
     if {"latitude", "longitude"}.issubset(d.columns):
-        map_df = d.dropna(subset=["latitude", "longitude"]).reset_index()  # job_id redevient une colonne
+        map_df = d.dropna(subset=["latitude", "longitude"]).copy()
 
         if not map_df.empty:
-            grouped = (
-                map_df.groupby(["latitude", "longitude"])
-                      .agg(
-                          count=("job_id", "count"),
-                          job_ids=("job_id", list),
-                          titles=("job_title", list),
-                          companies=("company_name", list),
-                          avg_score=("score_relevancy", "mean"),
-                      )
-                      .reset_index()
-            )
-            grouped["hover_text"] = grouped.apply(
-                lambda row: "<br>".join(
-                    f"• {t} @ {c}" for t, c in zip(row["titles"][:8], row["companies"][:8])
-                ) + ("<br>…" if row["count"] > 8 else ""),
-                axis=1,
+            # Normalise le score sur une échelle 0-1 pour le gradient de couleur
+            score_min, score_max = map_df["score_relevancy"].min(), map_df["score_relevancy"].max()
+            map_df["score_norm"] = (map_df["score_relevancy"] - score_min) / (score_max - score_min + 1e-9)
+
+            # Gradient rouge (faible) → jaune → vert (élevé), façon "Viridis-like" simple
+            def score_to_color(norm_score):
+                if norm_score < 0.5:
+                    # rouge → jaune
+                    r = 255
+                    g = int(255 * (norm_score * 2))
+                    b = 0
+                else:
+                    # jaune → vert
+                    r = int(255 * (1 - (norm_score - 0.5) * 2))
+                    g = 255
+                    b = 0
+                return [r, g, b]
+
+            colors = map_df["score_norm"].apply(score_to_color)
+            map_df["color_r"] = colors.apply(lambda c: c[0])
+            map_df["color_g"] = colors.apply(lambda c: c[1])
+            map_df["color_b"] = colors.apply(lambda c: c[2])
+
+            layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=map_df,
+                get_position=["longitude", "latitude"],
+                get_radius=3000,                    # points plus petits/précis
+                radius_min_pixels=4,                 # toujours visible même très dézoomé
+                radius_max_pixels=20,                # ne devient pas énorme en zoomant
+                get_fill_color="[color_r, color_g, color_b, 200]",
+                pickable=True,
+                auto_highlight=True,
+                stroked=True,
+                get_line_color=[255, 255, 255],
+                line_width_min_pixels=1,
             )
 
-            fig_map = px.scatter_mapbox(
-                grouped,
-                lat="latitude", lon="longitude",
-                size="count",
-                color="avg_score",
-                color_continuous_scale="RdYlGn",
-                zoom=3, height=450,
-                custom_data=["job_ids", "count"],
-            )
-            fig_map.update_traces(
-                text=grouped["hover_text"],
-                hovertemplate="<b>%{customdata[1]} offer(s)</b><br>%{text}<extra></extra>",
-            )
-            fig_map.update_layout(
-                mapbox=dict(
-                    style="carto-darkmatter",
-                    pitch=0,
-                    bearing=0,
-                ),
-                margin=dict(l=0, r=0, t=0, b=0),
-                coloraxis_colorbar=dict(title="Avg score"),
-                dragmode="select",   # ← glisser trace un rectangle de sélection (remplace "zoom")
-                selectdirection="any",
-                uirevision="offers_map",
+            view_state = pdk.ViewState(
+                latitude=map_df["latitude"].mean(),
+                longitude=map_df["longitude"].mean(),
+                zoom=3,
+                pitch=0,
             )
 
-            event = st.plotly_chart(
-                fig_map, width="stretch",
-                on_select="rerun", selection_mode="points",
-                key="offers_map",
-                config={
-                    "scrollZoom": True,
-                    "displayModeBar": True,
-                    "modeBarButtonsToAdd": ["select2d", "lasso2d"],
-                    "modeBarButtonsToRemove": ["pan2d"],
+            deck = pdk.Deck(
+                layers=[layer],
+                initial_view_state=view_state,
+                tooltip={
+                    "html": "<b>{company_name}</b><br/>{job_title}<br/>Score: {score_relevancy}",
+                    "style": {"backgroundColor": "steelblue", "color": "white"}
                 },
             )
 
-            if event.selection.points:
-                all_selected_ids = []
-                for pt in event.selection.points:
-                    idx = pt["point_index"]
-                    all_selected_ids.extend(grouped.iloc[idx]["job_ids"])
-                selected_job_ids = all_selected_ids
-            else:
-                st.caption("💡 Click or box-select points on the map to filter the table below.")
+            st.pydeck_chart(deck, width="stretch")
+
+            # ── Légende du score ────────────────────────────────────
+            legend_col1, legend_col2, legend_col3 = st.columns(3)
+            with legend_col1:
+                st.markdown(f"🔴 **Faible** (~{score_min:.1f})")
+            with legend_col2:
+                st.markdown(f"🟡 **Moyen** (~{(score_min+score_max)/2:.1f})")
+            with legend_col3:
+                st.markdown(f"🟢 **Élevé** (~{score_max:.1f})")
+
         else:
-            st.info("No geolocated offers to display on the map.")
+            st.info("No geolocated offers")
+            view_state = pdk.ViewState(latitude=-25.0, longitude=-60.0, zoom=2.5, pitch=0)
+            deck = pdk.Deck(layers=[], initial_view_state=view_state)
+            st.pydeck_chart(deck)
     else:
-        st.info("Columns 'latitude'/'longitude' not found — map skipped.")
+        st.info("Columns 'latitude'/'longitude' not found - Empty map")
+        view_state = pdk.ViewState(latitude=-25.0, longitude=-60.0, zoom=2.5, pitch=0)
+        deck = pdk.Deck(layers=[], initial_view_state=view_state)
+        st.pydeck_chart(deck)
 
-    render_offers_table(d, selected_job_ids)
-
+    render_offers_table(d)
 
     # ── Country pie chart ────────────────────────────────────────
     col1, col2 = st.columns(2)
