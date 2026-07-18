@@ -1,6 +1,8 @@
 # ── Secrets ──────────────────────────────────
 .env
 .streamlit/secrets.toml
+data_vis/.streamlit/secrets.toml
+
 
 # ── Python ───────────────────────────────────
 __pycache__/

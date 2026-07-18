@@ -546,7 +546,7 @@ def build_dashboard(d: pd.DataFrame) -> None:
                     "scrollZoom": True,
                     "displayModeBar": True,
                     "modeBarButtonsToAdd": ["select2d", "lasso2d"],
-                    "modeBarButtonsToRemove": ["pan2d"],
+                    #"modeBarButtonsToRemove": ["pan2d"],
                 },
             )
 
@@ -639,18 +639,6 @@ def build_dashboard(d: pd.DataFrame) -> None:
                 "Website": st.column_config.LinkColumn("Website")
             })
 
-    # ── Offers collected over time ────────────────────────────────
-    # Built from `d` (already filtered by max_days), so it updates automatically.
-    if "collected_at" in d.columns:
-        ts = (
-            d.assign(date=d["collected_at"].dt.date)
-             .groupby("date").size().reset_index(name="count")
-        )
-        fig_ts = px.line(
-            ts, x="date", y="count", markers=True,
-            title="Exploitable offers collected over time",
-        )
-        st.plotly_chart(fig_ts, width="stretch")
 
 
 # ══════════════════════════════════════════════════════════════════
