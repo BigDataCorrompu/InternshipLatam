@@ -6,6 +6,7 @@ import sys
 sys.path.append("../src")
 from APIendpoint import PlacesAPI
 from LLMprovider import LLM
+from utils import detect_language
 llm = LLM()
 placesAPI = PlacesAPI(os.getenv('MAPS_APP_KEY'))
 
@@ -131,14 +132,17 @@ class OfferAttribute(BaseModel):
     )
     spoken_languages_required: list[str] | None = Field(
         description=(
-            "STEP 1: Identify the actual language of the TEXT PROVIDED TO YOU (job_title + offer_description) — "
-            "base this ONLY on the words actually present in the text, never on assumptions about the country "
-            "or company. "
-            "STEP 2: If the text explicitly requires additional languages beyond its own (e.g. 'must speak Portuguese'), "
-            "add those too. "
-            "STEP 3: If nothing else is required, return ONLY the language identified in STEP 1. "
-            "EXCLUDE languages mentioned only as tech keywords (e.g. 'English documentation' in a Spanish text). "
-            "Return ONLY ISO 639-1 codes."
+            "STEP 1: Read the offer_description text CAREFULLY, word by word — do not skim. "
+            "Identify the actual language the text is written in, based STRICTLY on the words present. "
+            "Never guess based on the company name, country, or job title alone — if job_title is in English "
+            "but offer_description is in Spanish, the answer is Spanish, because the description is the "
+            "real signal, not the title. "
+            "STEP 2: Only if the text EXPLICITLY states an additional language requirement "
+            "(e.g. 'must speak Portuguese', 'bilingüe inglés'), add that language too. "
+            "STEP 3: If no additional requirement is stated, return ONLY the language from STEP 1. "
+            "EXCLUDE languages mentioned only as tech/documentation keywords. "
+            "FORMAT: Return ONLY two-letter ISO 639-1 codes (en, es, fr, pt) — "
+            "NEVER three-letter codes (eng, spa, fra, por) and NEVER full language names."
         )
     )
     @field_validator("is_remote", mode="before")
@@ -153,16 +157,28 @@ class OfferAttribute(BaseModel):
 extract_attributes = Extract(
     llm=llm.enrichement,
     task=(
-        'Find the seniority needed for this job offer or deduct it. '
-        'Find if the offer is in remote strictly from the text. '
-        'Find the contract type strictly from the text. '
-        'Identify the spoken languages required for the position (as ISO 639-1 codes).'
+        'Find the seniority needed for this job offer, or deduce it from context. '
+        'Find if the offer is remote, strictly from the text. '
+        'Find the contract type, strictly from the text. '
+        'Identify the language(s) required for this position, as ISO 639-1 two-letter codes ONLY '
+        '(e.g. "en", "es", "pt" — never 3-letter codes like "eng" or "spa").'
     ),
     output_key='attributes',
     schema=OfferAttribute,
     fields=['job_title', 'offer_description', 'is_remote']
 )
 
+
+
+
+def extract_attributes_node(state: JobOfferState) -> dict:
+    result = extract_attributes(state)
+    detected = detect_language(state.get("offer_description", ""))
+    langs = result.get("spoken_languages_required") or []
+    if detected and detected not in langs:
+        langs = langs + [detected]
+    result["spoken_languages_required"] = langs
+    return result
 
 
 
@@ -259,7 +275,7 @@ def route_after_find_location(state: JobOfferState):
         return "extract_location"
     
     # Continue the graph
-    return "extract_attributes"
+    return "extract_attributes_node"
 
 
 
@@ -306,7 +322,7 @@ builder.add_edge("extract_location", "find_location")
 
 # Attributes & Skills __________________________________________________________________
 builder.add_sequence([
-    ("extract_attributes", extract_attributes),
+    ("extract_attributes", extract_attributes_node),
     ("extract_skills", extract_skills),
 ])
 

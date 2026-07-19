@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from database import Database
 from bucket import Bucket
+import langdetect
 logger = logging.getLogger(__name__)
 
 
@@ -215,3 +216,14 @@ def normalise_list_language(liste_brute):
     
     # Suppression des valeurs None et des doublons, puis conversion en liste
     return list(set(code for code in resultat_clean if code is not None))
+
+
+
+def detect_language(text: str) -> str | None:
+    """Détecte la langue sur l'ensemble des langues supportées, retourne un code ISO 639-1."""
+    if not text or len(text.strip()) < 20:
+        return None
+    try:
+        return langdetect.detect(text)
+    except langdetect.LangDetectException:
+        return None
