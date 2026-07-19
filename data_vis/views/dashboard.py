@@ -94,18 +94,11 @@ def load_real_offers():
         is_remote,
         offer_languages,
         seniority,
-        (
-            SELECT jsonb_agg(DISTINCT val)
-            FROM (
-                SELECT jsonb_array_elements_text(
-                    COALESCE(array_to_json(skills_languages)::jsonb, '[]'::jsonb) || 
-                    COALESCE(array_to_json(skills_frameworks)::jsonb, '[]'::jsonb) || 
-                    COALESCE(array_to_json(skills_aptitudes)::jsonb, '[]'::jsonb) || 
-                    COALESCE(array_to_json(skills_soft)::jsonb, '[]'::jsonb) ||
-                    COALESCE(array_to_json(alternative_job_titles)::jsonb, '[]'::jsonb)
-                ) AS val
-            ) sub
-        ) AS all_keywords,
+        skills_languages,
+        skills_frameworks,
+        skills_aptitudes,
+        skills_soft,
+        alternative_job_titles,
         score_relevancy,
         explanation,
         company_name,
@@ -122,6 +115,7 @@ def load_real_offers():
     """
     db.execute('SELECT serving.refresh_job_offer_if_stale();')
     return db.execute(query)
+
 
 
 # Accelerate research by keywords
@@ -175,21 +169,35 @@ def load_and_transform_dataframe() -> list:
     if "collected_at" in df.columns:
         df["collected_at"] = pd.to_datetime(df["collected_at"])
 
-    # __ FULL COUNTRY NAME __
+    # ── FULL COUNTRY NAME ──
     cc = coco.CountryConverter()
 
-    # Only convert non NaN
+    # ── Only convert non NaN ──
     mask = df['country'].notna()
     mask_language = df['offer_languages'].notna()
 
-    # Apply conversion
+    # ── Apply conversion ──
     df.loc[mask, 'country_full'] = cc.convert(
     df.loc[mask, 'country'].tolist(), 
     to='name_short'
     )
-    #Fill NaN with Nan
+    # ── Fill NaN with Nan ──
     df['country_full'] = df['country_full'].replace('not found', np.nan)
     df.loc[mask_language, 'offer_languages_full'] = df.loc[mask_language, 'offer_languages'].apply(convert_language_list)
+
+    # ── Construit all_keywords en Python, à partir des colonnes séparées ──
+    KEYWORD_COLS = ["skills_languages", "skills_frameworks", "skills_aptitudes",
+                     "skills_soft", "alternative_job_titles"]
+
+    def _combine_keywords(row):
+        combined = []
+        for col in KEYWORD_COLS:
+            val = row.get(col)
+            if isinstance(val, list):
+                combined.extend(val)
+        return combined
+
+    df["all_keywords"] = df.apply(_combine_keywords, axis=1)
 
     dict_reversed_index = generate_reverse_index(df)
     return df, dict_reversed_index
@@ -205,11 +213,6 @@ def build_city_country_map(df: pd.DataFrame) -> dict:
     for _, row in df.dropna(subset=["city", "country"]).iterrows():
         mapping[row["city"]] = row["country_full"]
     return mapping
-
-# ══════════════════════════════════════════════════════════════════
-# Lists for widgets
-# ══════════════════════════════════════════════════════════════════
-SEARCH_COLUMNS = ["all_keywords"]
 
 
 
@@ -242,7 +245,16 @@ city_country_map = build_city_country_map(df)
 REMOTE_LABELS = filters["remote_labels"]
 REMOTE_VALUES = {v: k for k, v in REMOTE_LABELS.items()}
 
+# ══════════════════════════════════════════════════════════════════
+# Lists for widgets
+# ══════════════════════════════════════════════════════════════════
+SEARCH_COLUMNS = ["all_keywords"]
+ALL_COMPANIES = sorted(df["company_name"].dropna().unique().tolist())
 
+
+# ___ Map highlight ___
+if "highlighted_job_id" not in st.session_state:
+    st.session_state["highlighted_job_id"] = None
 
 # ══════════════════════════════════════════════════════════════════
 # Filtering logic
@@ -368,6 +380,8 @@ if st.session_state.pop("_filters_dirty", False) or "w_score" not in st.session_
     st.session_state["w_seniorities"] = f["seniorities"]
     st.session_state["w_remote"]      = REMOTE_LABELS[f["remote"]]
     st.session_state["w_maxdays"]     = f["max_days"]
+    #Table company 
+    st.session_state["w_companies"] = f["companies"]
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -385,18 +399,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown(
-        "[💼 LinkedIn](https://www.linkedin.com/in/roland-oucherif/) · "
-        "[🔗 GitHub](https://github.com/BigDataCorrompu/InternshipLatam)"
-    )
-    st.divider()
-    st.caption("Ask the chatbot !")
     st.header("🔎 Filters")
     
     if st.button("♻️ Reset filters"):
         st.session_state["filters"] = default_filters(filters)
         st.session_state["_filters_dirty"] = True
         st.rerun()
+
     st.text_input(
         "🔍 Keywords (title, skills...)",
         key="w_search",
@@ -415,7 +424,7 @@ with st.sidebar:
     st.multiselect("🗣️ Offer language", filters["languages"], key="w_languages")
     st.multiselect("📈 Seniority", filters["seniorities"], key="w_seniorities")
     st.multiselect("📄 Contract type", filters["contracts"], key="w_contracts")
-    st.multiselect("🏢 Company", filters["companies"], key="w_companies")
+    st.multiselect("🏢 Company", ALL_COMPANIES, key="w_companies")
 
     st.select_slider(
         "📅 Date range",
@@ -476,18 +485,43 @@ def render_offers_table(d: pd.DataFrame, selected_job_ids: list | None = None) -
         table_source = d[d.index.isin(selected_job_ids)]
         st.caption(f"📍 Showing {len(table_source)} offer(s) at the selected location(s).")
 
+    display_df = table_source.copy()
+    if "offer_languages_full" in display_df.columns:
+        display_df["languages"] = display_df["offer_languages_full"].apply(
+            lambda x: ", ".join(x) if isinstance(x, list) else ""
+        )
+
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
-                              "seniority", "score_relevancy"] if c in table_source.columns]
+                              "seniority", "languages", "score_relevancy"]
+                 if c in display_df.columns]
+
     st.subheader("📋 Offers")
-    st.dataframe(table_source[show_cols], hide_index=True, width="stretch")
+    event = st.dataframe(
+        display_df[show_cols],
+        hide_index=True,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="single-row",
+        key="offers_table",
+    )
+
+    if event.selection.rows:
+            clicked_row_idx = event.selection.rows[0]
+            if clicked_row_idx < len(display_df):
+                clicked_job_id = display_df.index[clicked_row_idx]
+                if st.session_state.get("highlighted_job_id") != clicked_job_id:
+                    st.session_state["highlighted_job_id"] = clicked_job_id
+                    st.rerun()
+            else:
+                # Sélection périmée (le tableau a changé de taille) — on l'ignore silencieusement
+                st.session_state["highlighted_job_id"] = None
 
 
-
-def build_dashboard(d: pd.DataFrame) -> None:
+def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -> None:
     # ── Metric ───────────────────────────────────────────────────
     st.metric("📦 Offers currently displayed", len(d))
 
-    # ── Map (Plotly, clickable, stacked by location) ────────────────
+    # ── Map (Plotly, clickable, stacked by location, highlight + recenter) ──
     selected_job_ids = None
 
     if {"latitude", "longitude"}.issubset(d.columns):
@@ -512,16 +546,36 @@ def build_dashboard(d: pd.DataFrame) -> None:
                 axis=1,
             )
 
+            # ── Highlight du point sélectionné depuis le tableau ──────────
+            highlighted_id = st.session_state.get("highlighted_job_id")
+
+            grouped["is_highlighted"] = grouped["job_ids"].apply(
+                lambda ids: highlighted_id in ids if highlighted_id else False
+            )
+            grouped["marker_color"] = grouped["is_highlighted"].map(
+                {True: "#2ECC71", False: "#FF4B4B"}
+            )
+
+            # ── Recentrage sur le(s) point(s) surligné(s), barycentre si plusieurs ──
+            highlighted_points = grouped[grouped["is_highlighted"]]
+            if not highlighted_points.empty:
+                map_center = dict(
+                    lat=highlighted_points["latitude"].mean(),
+                    lon=highlighted_points["longitude"].mean(),
+                )
+                map_zoom = 8
+            else:
+                map_center = dict(lat=-25, lon=-60)  # vue par défaut Amérique du Sud
+                map_zoom = 3
+
             fig_map = px.scatter_mapbox(
                 grouped,
                 lat="latitude", lon="longitude",
-                size="count",
-                color="avg_score",
-                color_continuous_scale="RdYlGn",
-                zoom=3, height=450,
                 custom_data=["job_ids", "count"],
+                height=450,
             )
             fig_map.update_traces(
+                marker=dict(size=10, color=grouped["marker_color"]),
                 text=grouped["hover_text"],
                 hovertemplate="<b>%{customdata[1]} offer(s)</b><br>%{text}<extra></extra>",
             )
@@ -530,12 +584,16 @@ def build_dashboard(d: pd.DataFrame) -> None:
                     style="carto-darkmatter",
                     pitch=0,
                     bearing=0,
+                    center=map_center,
+                    zoom=map_zoom,
                 ),
                 margin=dict(l=0, r=0, t=0, b=0),
-                coloraxis_colorbar=dict(title="Avg score"),
-                dragmode="select",   # ← glisser trace un rectangle de sélection (remplace "zoom")
+                dragmode="select",   # glisser trace un rectangle de sélection
                 selectdirection="any",
-                uirevision="offers_map",
+                # uirevision change avec highlighted_id pour forcer le recentrage
+                # au changement de sélection, tout en préservant le zoom/pan manuel
+                # de l'utilisateur tant que la sélection ne change pas.
+                uirevision=f"offers_map_{highlighted_id}" if highlighted_id else "offers_map",
             )
 
             event = st.plotly_chart(
@@ -545,8 +603,6 @@ def build_dashboard(d: pd.DataFrame) -> None:
                 config={
                     "scrollZoom": True,
                     "displayModeBar": True,
-                    "modeBarButtonsToAdd": ["select2d", "lasso2d"],
-                    #"modeBarButtonsToRemove": ["pan2d"],
                 },
             )
 
@@ -584,7 +640,17 @@ def build_dashboard(d: pd.DataFrame) -> None:
     # percentages of a pie wouldn't sum to 100% — a bar chart of
     # raw counts is more honest here.
     with col2:
-        lang_counts = d["offer_languages_full"].dropna().explode().dropna().value_counts()
+        lang_counts = (
+            d["offer_languages_full"]
+            .dropna()
+            .explode()
+            .dropna()
+        )
+        # Filtre les valeurs vides/None résiduelles (string "None", "", espaces)
+        lang_counts = lang_counts[
+            lang_counts.astype(str).str.strip().str.lower().isin(["none", "nan", ""]) == False
+        ]
+        lang_counts = lang_counts.value_counts()
         lang_counts = group_small_categories(lang_counts, threshold_pct=0.01)
         lang_counts = lang_counts.reset_index()
         lang_counts.columns = ["language", "count"]
@@ -606,38 +672,108 @@ def build_dashboard(d: pd.DataFrame) -> None:
         )
         st.plotly_chart(fig_seniority, width="stretch")
 
-    # ── Top 5 company poster table ───────────────────────────────────────
+    # ── Top skills/keywords bar chart ────────────────────────────
     with col4:
-        st.markdown("**🏆 Top 5 job posters companies**")
-        d_with_site = d[d["website"].notna() & (d["website"] != "")]
-        company_count = d_with_site["company_name"].value_counts().reset_index()
-        company_count.columns = ["company_name", "nb_offers"]
-        company_info = (
-            d_with_site.groupby("company_name")
-            .agg({
-                "website": "first",
-                "country_full": lambda x: ", ".join(sorted(set(x.dropna()))),
-            })
-            .reset_index()
+        st.markdown("**🛠️ Top required skills & frameworks**")
+
+        KEYWORD_CATEGORIES = {
+            "Language": "skills_languages",
+            "Framework": "skills_frameworks",
+            "Aptitude": "skills_aptitudes",
+            "Soft skill": "skills_soft",
+        }
+
+        records = []
+        for label, col in KEYWORD_CATEGORIES.items():
+            if col in d.columns:
+                exploded = d[col].dropna().explode().dropna()  # ← dropna() après explode aussi
+                exploded = exploded[exploded.apply(lambda x: isinstance(x, str))]  # sécurité type
+                exploded = exploded[exploded.str.strip() != ""]
+                for kw in exploded:
+                    records.append({"keyword": kw.strip().lower(), "category": label})
+
+        kw_df = pd.DataFrame(records)
+
+        if not kw_df.empty:
+            top_kw = (
+                kw_df.groupby(["keyword", "category"])
+                    .size().reset_index(name="count")
+                    .sort_values("count", ascending=False)
+                    .head(15)
+            )
+            fig_kw = px.bar(
+                top_kw, x="count", y="keyword", orientation="h",
+                color="category",
+                title="Top 15 required skills/keywords",
+            )
+            fig_kw.update_layout(yaxis={"categoryorder": "total ascending"})
+            st.plotly_chart(fig_kw, width="stretch")
+        else:
+            st.info("No keywords found in the filtered offers.")
+
+    # ── Company poster list — scrollable, clickable, filterable ──────────
+    st.markdown("**🏆 Job posters companies**")
+
+    # IMPORTANT : base sur les données filtrées par TOUT SAUF l'entreprise
+    # (sinon cocher une boîte fait disparaître les autres de la liste)
+    d_base = d_filtered_without_company  # ← le dataframe filtré par rôle/ville/etc, PAS par company
+    d_with_site = d_base[d_base["website"].notna() & (d_base["website"] != "")]
+
+    company_count = d_with_site["company_name"].value_counts().reset_index()
+    company_count.columns = ["company_name", "nb_offers"]
+    company_info = (
+        d_with_site.groupby("company_name")
+        .agg({
+            "website": "first",
+            "city": lambda x: ", ".join(sorted(set(x.dropna()))),
+            "country_full": lambda x: ", ".join(sorted(set(x.dropna()))),
+        })
+        .reset_index()
+    )
+
+    all_companies = (
+        company_count.merge(company_info, on="company_name", how="left")
+        .sort_values("nb_offers", ascending=False)
+        .rename(columns={
+            "company_name": "Company",
+            "city": "City",
+            "country_full": "Countries",
+            "website": "Website",
+            "nb_offers": "Offers",
+        })
+    )
+
+    if "selected_companies" not in st.session_state:
+        st.session_state["selected_companies"] = []
+
+    all_companies.insert(
+            0, "Select",
+            all_companies["Company"].isin(f["companies"])   # ← lit f, pas selected_companies
         )
-        top5 = (
-            company_count.merge(company_info, on="company_name", how="left")
-            .sort_values("nb_offers", ascending=False)
-            .head(5)
-            .rename(columns={
-                "company_name": "Company",
-                "country_full": "Countries",
-                "website": "Website",
-                "nb_offers": "Offers",
-            })
-        )
-        st.dataframe(
-            top5, 
-            hide_index=True, 
-            width="stretch",
-            column_config={
-                "Website": st.column_config.LinkColumn("Website")
-            })
+
+    edited = st.data_editor(
+        all_companies[["Select", "Company", "Website", "Offers", "City", "Countries"]],
+        hide_index=True,
+        width="stretch",
+        height=350,
+        disabled=["Company", "Website", "Offers", "City", "Countries"],
+        column_config={
+            "Select": st.column_config.CheckboxColumn("", width="small"),
+            "Company": st.column_config.TextColumn("Company"),
+            "Website": st.column_config.LinkColumn(
+                "Website", display_text=r"https?://(?:www\.)?([^/]+)", width="small",
+            ),
+            "Offers": st.column_config.NumberColumn("Offers", width="small"),
+            "City": st.column_config.TextColumn("City"),
+        },
+        key="company_editor",
+    )
+
+    newly_selected = edited.loc[edited["Select"], "Company"].tolist()
+    if set(newly_selected) != set(f["companies"]):
+        st.session_state["filters"]["companies"] = newly_selected
+        st.session_state["_filters_dirty"] = True
+        st.rerun()
 
 
 
@@ -645,8 +781,14 @@ def build_dashboard(d: pd.DataFrame) -> None:
 # Apply filters and display
 # ══════════════════════════════════════════════════════════════════
 filtered_df = apply_filters(df, f, dict_reversed_index, city_country_map)
+
+# Copie des filtres actifs, sans le filtre "companies"
+filters_without_company = dict(f)
+filters_without_company["companies"] = []
+d_filtered_without_company = apply_filters(df, filters_without_company, dict_reversed_index, city_country_map)
+
 st.subheader("📊 Dashboard")
-build_dashboard(filtered_df)
+build_dashboard(filtered_df, d_filtered_without_company)
 st.caption(f"**{len(filtered_df)}** offers match the filters (out of {len(df)}).")
 
 

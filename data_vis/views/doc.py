@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DOCS_ORDER = {
     "👋 Exemple Prompt to use": "StreamlitPrompt.md",
-    "🏠 README": "README.md",
+    "🏠 Project Overview": "ProjectOverview.md",
     "⚙️ Pipeline": "Pipeline.md",
     "🥉 Bronze Layer": "BronzeTable.md",
     "🥈 Silver Layer": "SilverTables.md",
