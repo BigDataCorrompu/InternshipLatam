@@ -14,7 +14,7 @@ langgraph-sdk>=0.2,<1
 
 # Base de données & Storage
 psycopg2-binary>=2.9,<3
-sqlalchemy>=2.0,<3
+sqlalchemy>=1.4,<2.0
 b2sdk>=2.12,<3
 
 # Validation & Utilitaires
