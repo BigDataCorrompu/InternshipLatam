@@ -20,6 +20,7 @@ Performance notes:
 import os
 import sys
 import re
+import time
 import importlib.util
 from collections import defaultdict
 from pathlib import Path
@@ -67,9 +68,6 @@ from dashboard_agent import (
 # ════════════════════════════════════════════════════════════════════
 st.set_page_config(page_title="AI Job Offer Dashboard Latam", page_icon="🏙️", layout="wide")
 st.title("🏙️ AI Powered pipeline Job offers LATAM")
-
-# Force scroll to top on rerun
-st.markdown("<script>window.scrollTo(0, 0);</script>", unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -868,6 +866,23 @@ with st.container():
 
 # ── Input bar (native, always visible bottom of page) ──
 prompt = st.chat_input("Ask me anything...")
+
+# ── Force le retour en haut de page ──
+# st.chat_input pousse Streamlit à auto-scroller vers le bas après le rendu ;
+# on corrige pendant 1.5s juste après (le temps que ce comportement se déclenche).
+st.html(f"""
+<script>
+    (function() {{
+        let tries = 0;
+        const forceTop = setInterval(() => {{
+            window.scrollTo(0, 0);
+            tries++;
+            if (tries > 15) clearInterval(forceTop);
+        }}, 100);
+    }})();
+</script>
+<!-- run:{time.time()} -->
+""", unsafe_allow_javascript=True)
 
 if prompt and prompt.strip():
     st.session_state["chat_open"] = True
