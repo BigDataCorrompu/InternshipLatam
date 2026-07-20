@@ -313,7 +313,7 @@ builder.add_conditional_edges(
     route_after_find_location,
     {
         "extract_location": "extract_location",
-        "extract_attributes": "extract_attributes"
+        "extract_attributes_node": "extract_attributes_node"
     }
 )
 
@@ -322,7 +322,7 @@ builder.add_edge("extract_location", "find_location")
 
 # Attributes & Skills __________________________________________________________________
 builder.add_sequence([
-    ("extract_attributes", extract_attributes_node),
+    ("extract_attributes_node", extract_attributes_node),
     ("extract_skills", extract_skills),
 ])
 
