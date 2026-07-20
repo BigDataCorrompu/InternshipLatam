@@ -1,7 +1,7 @@
 from airflow.decorators import dag, task
 from airflow.models import Variable
 from airflow.exceptions import AirflowSkipException
-
+import traceback
 from datasets import BRONZE_OFFERS, STAGING_ENRICHED
 from database import Database
 
@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 SAVE_EVERY = 10        # flush vers staging tous les N enrichissements
-MAX_PER_RUN = None     # None = tout ; un int pour lisser le rattrapage
+MAX_PER_RUN = 3     # None = tout ; un int pour lisser le rattrapage
 
 
 
@@ -111,6 +111,7 @@ def silver_enrichment():
             except Exception as e:
                 ko += 1
                 logger.warning(f"[ENRICH] {i}/{len(pending)} id={id_job} status=failed err={e}")
+                logger.warning(traceback.format_exc())
 
             if len(buffer) >= SAVE_EVERY:
                 flush()
