@@ -45,7 +45,7 @@ st.markdown(f"""
     <style>
     /* On réduit l'espace en haut, mais on ne cache PLUS le header pour garder le bouton de la barre latérale */
     .block-container {{
-        padding-top: 1rem !important; 
+        padding-top: 4rem !important; 
         margin-top: 0rem !important;
         padding-bottom: 0rem !important;
     }}
