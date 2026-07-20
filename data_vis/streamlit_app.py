@@ -13,10 +13,11 @@ sys.path.insert(0, str(DOC_DIR))
 dashboard_path = CURRENT_DIR / "views" / "dashboard.py"
 doc_path = CURRENT_DIR / "views" / "doc.py"
 
+# On remet l'état étendu (expanded) pour que la barre latérale s'affiche
 st.set_page_config(
     page_title="InternshipLatam Dashboard",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 def render_insights():
@@ -39,19 +40,16 @@ hov_dash = "1.0" if pg.title == "Dashboard" else "0.8"
 hov_ins  = "1.0" if pg.title == "Insights" else "0.8"
 hov_doc  = "1.0" if pg.title == "Documentation (README)" else "0.8"
 
-
 # --- INJECTION CSS (couleurs sombres/transparentes + boutons plus fins) ---
 st.markdown(f"""
     <style>
-    /* Supprimer l'espace vide en haut et cacher le header natif */
+    /* On réduit l'espace en haut, mais on ne cache PLUS le header pour garder le bouton de la barre latérale */
     .block-container {{
-        padding-top: 0rem !important;
+        padding-top: 1rem !important; 
         margin-top: 0rem !important;
         padding-bottom: 0rem !important;
     }}
-    header[data-testid="stHeader"] {{
-        display: none !important; 
-    }}
+    
     div[data-testid="stHorizontalBlock"] {{
         gap: 0rem !important;
     }}
