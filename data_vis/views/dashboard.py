@@ -571,24 +571,24 @@ def render_offers_table(d: pd.DataFrame) -> None:
     elif sort_choice == "Most recent" and "collected_at" in display_df.columns:
         display_df = display_df.sort_values("collected_at", ascending=False)
 
+    # ── FEATURE DÉTAILS : SÉLECTION ──
     display_df["_is_selected"] = display_df["job_id"].isin(selected_ids)
-    display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
 
-    # ── SUPPRESSION des colonnes explanation et keywords_str du tableau ──
+    # Note : Le tri par "_is_selected" a bien été supprimé pour éviter le bug de clic !
+
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
                              "seniority", "languages", "date", "score_relevancy"]
                  if c in display_df.columns]
 
     display_df.insert(0, "Select", display_df["_is_selected"])
 
-    # ── CORRECTION : Suppression de on_select et selection_mode ici ──
     edited = st.data_editor(
         display_df[["Select", "job_id"] + show_cols],
         hide_index=True,
         width="stretch",
         disabled=show_cols + ["job_id"],
         column_config={
-            "Select": st.column_config.CheckboxColumn("", width="small"),
+            "Select": st.column_config.CheckboxColumn("Détails", width="small"),
             "job_id": None,
             "job_title": st.column_config.TextColumn("Title", width="large"),
             "company_name": st.column_config.TextColumn("Company", width="small"),
@@ -607,7 +607,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
         st.session_state["map_selected_job_ids"] = new_selected
         st.rerun()
 
-    # ── AFFICHAGE DES DÉTAILS (EXPLICATION & MOTS-CLÉS) DES OFFRES COCHÉES ──
+    # ── FEATURE DÉTAILS : AFFICHAGE SOUS LE TABLEAU ──
     if new_selected:
         st.markdown("### 💡 Selected Offer Details")
         for job_id in new_selected:
@@ -621,7 +621,6 @@ def render_offers_table(d: pd.DataFrame) -> None:
                     st.markdown(f"**Explanation:** {selected_job.get('explanation', 'No explanation available.')}")
                     st.markdown(f"**Keywords:** `{selected_job.get('keywords_str', 'None')}`")
 
-                    
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
 # ════════════════════════════════════════════════════════════════════
