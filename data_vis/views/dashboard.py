@@ -543,7 +543,10 @@ def render_offers_table(d: pd.DataFrame) -> None:
             lambda x: ", ".join(l for l in x if isinstance(l, str)).upper() if isinstance(x, list) else ""
         )
 
-    # ── Apply the chosen sort ──
+    # ── Format date for display ──
+    if "collected_at" in display_df.columns:
+        display_df["date"] = display_df["collected_at"].dt.strftime("%Y-%m-%d")
+
     if sort_choice == "Relevancy ↓":
         display_df = display_df.sort_values("score_relevancy", ascending=False)
     elif sort_choice == "Relevancy ↑":
@@ -553,12 +556,11 @@ def render_offers_table(d: pd.DataFrame) -> None:
     elif sort_choice == "Most recent" and "collected_at" in display_df.columns:
         display_df = display_df.sort_values("collected_at", ascending=False)
 
-    # ── Selected rows always pinned to the top, regardless of sort ──
     display_df["_is_selected"] = display_df["job_id"].isin(selected_ids)
     display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
 
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
-                             "seniority", "languages", "score_relevancy"]
+                             "seniority", "languages", "date", "score_relevancy"]
                  if c in display_df.columns]
 
     display_df.insert(0, "Select", display_df["_is_selected"])
@@ -577,6 +579,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
             "country_full": st.column_config.TextColumn("Country", width="small"),
             "seniority": st.column_config.TextColumn("Level", width="small"),
             "languages": st.column_config.TextColumn("Languages", width="small"),
+            "date": st.column_config.TextColumn("Collected", width="small"),
             "score_relevancy": st.column_config.NumberColumn("Relevancy", width="small"),
         },
         key="offers_editor",
@@ -586,6 +589,33 @@ def render_offers_table(d: pd.DataFrame) -> None:
     if new_selected != selected_ids:
         st.session_state["map_selected_job_ids"] = new_selected
         st.rerun()
+
+    # ── Offer detail viewer (keywords + explanation) ──────────────
+    st.markdown("**🔍 Why this score?**")
+    offer_labels = {
+        row["job_id"]: f"{row['job_title']} @ {row['company_name']}"
+        for _, row in display_df.iterrows()
+    }
+    if offer_labels:
+        chosen_id = st.selectbox(
+            "Select an offer to see details",
+            options=list(offer_labels.keys()),
+            format_func=lambda jid: offer_labels[jid],
+            key="detail_offer_select",
+            label_visibility="collapsed",
+        )
+        offer_row = display_df[display_df["job_id"] == chosen_id].iloc[0]
+
+        with st.container(border=True):
+            explanation = offer_row.get("explanation")
+            st.markdown(f"**Score:** {offer_row.get('score_relevancy', 'N/A')}")
+            st.markdown(f"**Explanation:** {explanation if isinstance(explanation, str) else 'Not available.'}")
+
+            keywords = offer_row.get("all_keywords", [])
+            if isinstance(keywords, list) and keywords:
+                st.markdown("**Keywords:** " + ", ".join(sorted(set(k for k in keywords if isinstance(k, str)))))
+            else:
+                st.caption("No keywords extracted for this offer.")
 
 
 # ════════════════════════════════════════════════════════════════════
