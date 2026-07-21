@@ -537,7 +537,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
             st.rerun()
 
     if selected_ids:
-        st.caption(f"📍 Charts below reflect your **{len(selected_ids)} selected offer(s)**, not the full filtered set.")
+        st.info(f"📍 Charts below reflect your **{len(selected_ids)} selected offer(s)**, not the full filtered set.")
 
     if d.empty:
         st.info("No offers to display.")
