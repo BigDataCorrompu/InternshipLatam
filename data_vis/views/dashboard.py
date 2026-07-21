@@ -527,6 +527,9 @@ def render_offers_table(d: pd.DataFrame) -> None:
     with header_col3:
         if st.button("🗑️ Clear selection", key="clear_offers_selection"):
             st.session_state["map_selected_job_ids"] = set()
+            # On vide aussi le cache du tableau lors du clear
+            if "offers_editor" in st.session_state:
+                del st.session_state["offers_editor"]
             st.rerun()
 
     if d.empty:
@@ -571,10 +574,11 @@ def render_offers_table(d: pd.DataFrame) -> None:
     elif sort_choice == "Most recent" and "collected_at" in display_df.columns:
         display_df = display_df.sort_values("collected_at", ascending=False)
 
-    # ── FEATURE DÉTAILS : SÉLECTION ──
+    # ── FEATURE SÉLECTION & TRI EN HAUT RÉACTIVÉ ──
     display_df["_is_selected"] = display_df["job_id"].isin(selected_ids)
-
-    # Note : Le tri par "_is_selected" a bien été supprimé pour éviter le bug de clic !
+    
+    # ✅ ON REMET LE TRI : Les cases cochées sautent en priorité tout en haut !
+    display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
 
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
                              "seniority", "languages", "date", "score_relevancy"]
@@ -605,22 +609,26 @@ def render_offers_table(d: pd.DataFrame) -> None:
     new_selected = set(edited.loc[edited["Select"], "job_id"].tolist())
     if new_selected != selected_ids:
         st.session_state["map_selected_job_ids"] = new_selected
+        
+        # ✅ ASTUCE ANTI-BUG : On supprime la mémoire interne des numéros de lignes du tableau 
+        # juste avant le rerun pour qu'il s'adapte au nouveau tri sans se tromper de ligne !
+        if "offers_editor" in st.session_state:
+            del st.session_state["offers_editor"]
+            
         st.rerun()
 
     # ── FEATURE DÉTAILS : AFFICHAGE SOUS LE TABLEAU ──
     if new_selected:
         st.markdown("### 💡 Selected Offer Details")
         
-        # 1. Fonction pour renvoyer la couleur Streamlit ET l'émoji pour le menu
         def get_score_visuals(score):
             if score >= 7:
-                return "green", "🟢"   # Vert pour les scores >= 7
+                return "green", "🟢"
             elif score >= 4:
-                return "orange", "🟡"  # Jaune/Orange pour les scores entre 4 et 7
+                return "orange", "🟡"
             else:
-                return "red", "🔴"     # Rouge pour les scores < 4
+                return "red", "🔴"
 
-        # 2. Préparer le dictionnaire avec la puce de couleur dans le texte
         options_dict = {}
         for job_id in new_selected:
             match = display_df[display_df["job_id"] == job_id]
@@ -631,11 +639,8 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 score = selected_job.get("score_relevancy", 0)
                 
                 _, emoji = get_score_visuals(score)
-                
-                # On ajoute l'émoji directement dans le libellé du menu déroulant !
                 options_dict[job_id] = f"{emoji} [{score}/10] {title} ({company})"
         
-        # 3. Menu déroulant pour sélectionner l'offre
         selected_job_id_to_display = st.selectbox(
             "Select an offer to view details:",
             options=list(options_dict.keys()),
@@ -643,7 +648,6 @@ def render_offers_table(d: pd.DataFrame) -> None:
             key="details_offer_selector"
         )
         
-        # 4. Affichage des détails sous le menu
         if selected_job_id_to_display:
             match = display_df[display_df["job_id"] == selected_job_id_to_display]
             if not match.empty:
@@ -653,8 +657,6 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 score = job.get("score_relevancy", 0)
                 
                 color, _ = get_score_visuals(score)
-                
-                # Le titre de l'expander garde son formatage couleur Markdown
                 expander_title = f"📌 :{color}[**[{score}/10]**] **{title}** ({company})"
                 
                 with st.expander(expander_title, expanded=True):
