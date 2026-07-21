@@ -532,6 +532,9 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 del st.session_state["offers_editor"]
             st.rerun()
 
+    if selected_ids:
+        st.caption(f"📍 Charts below reflect your **{len(selected_ids)} selected offer(s)**, not the full filtered set.")
+
     if d.empty:
         st.info("No offers to display.")
         return
@@ -694,7 +697,6 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
     if selected_ids:
         d_analysis = d[d.index.isin(selected_ids)]
         d_company_base = d_filtered_without_company[d_filtered_without_company.index.isin(selected_ids)]
-        st.info(f"📍 Charts below reflect your **{len(d_analysis)} selected offer(s)**, not the full filtered set.")
     else:
         d_analysis = d
         d_company_base = d_filtered_without_company
