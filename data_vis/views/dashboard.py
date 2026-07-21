@@ -543,8 +543,18 @@ def render_offers_table(d: pd.DataFrame) -> None:
             lambda x: ", ".join(l for l in x if isinstance(l, str)).upper() if isinstance(x, list) else ""
         )
 
-    # ── Format date for display ──
-    if "collected_at" in display_df.columns:
+    # ── Date: published_at, fallback to collected_at if missing or implausible ──
+    if "published_at" in display_df.columns:
+        published = pd.to_datetime(display_df["published_at"], errors="coerce")
+        collected = pd.to_datetime(display_df.get("collected_at"), errors="coerce")
+
+        # Treat as invalid if missing, or outside a plausible range (e.g. bad parsing)
+        today = pd.Timestamp.now(tz=published.dt.tz if published.dt.tz else None)
+        is_valid = published.notna() & (published >= pd.Timestamp("2015-01-01", tz=published.dt.tz)) & (published <= today)
+
+        display_df["date"] = published.where(is_valid, collected)
+        display_df["date"] = display_df["date"].dt.strftime("%Y-%m-%d")
+    elif "collected_at" in display_df.columns:
         display_df["date"] = display_df["collected_at"].dt.strftime("%Y-%m-%d")
 
     if sort_choice == "Relevancy ↓":
@@ -590,7 +600,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
         st.session_state["map_selected_job_ids"] = new_selected
         st.rerun()
 
-    # ── Offer detail viewer (keywords + explanation) ──────────────
+    # ── Offer detail viewer — keywords + hover tooltip for explanation ──
     st.markdown("**🔍 Why this score?**")
     offer_labels = {
         row["job_id"]: f"{row['job_title']} @ {row['company_name']}"
@@ -605,18 +615,20 @@ def render_offers_table(d: pd.DataFrame) -> None:
             label_visibility="collapsed",
         )
         offer_row = display_df[display_df["job_id"] == chosen_id].iloc[0]
+        explanation = offer_row.get("explanation")
+        explanation_text = explanation if isinstance(explanation, str) else "Not available."
+        # HTML `title` attribute = native browser tooltip on hover, no click needed
+        safe_explanation = explanation_text.replace('"', "&quot;")
 
-        with st.container(border=True):
-            explanation = offer_row.get("explanation")
-            st.markdown(f"**Score:** {offer_row.get('score_relevancy', 'N/A')}")
-            st.markdown(f"**Explanation:** {explanation if isinstance(explanation, str) else 'Not available.'}")
+        keywords = offer_row.get("all_keywords", [])
+        keywords_str = ", ".join(sorted(set(k for k in keywords if isinstance(k, str)))) if isinstance(keywords, list) else ""
 
-            keywords = offer_row.get("all_keywords", [])
-            if isinstance(keywords, list) and keywords:
-                st.markdown("**Keywords:** " + ", ".join(sorted(set(k for k in keywords if isinstance(k, str)))))
-            else:
-                st.caption("No keywords extracted for this offer.")
-
+        st.markdown(
+            f"**Score:** {offer_row.get('score_relevancy', 'N/A')} "
+            f'<span title="{safe_explanation}" style="cursor: help; color: #888;">ℹ️ hover for explanation</span>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(f"**Keywords:** {keywords_str or '*None extracted*'}")
 
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
