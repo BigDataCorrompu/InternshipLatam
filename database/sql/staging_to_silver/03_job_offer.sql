@@ -22,5 +22,9 @@ JOIN analytics.company c ON c.company_name = s.raw_result->>'company_name'
 LEFT JOIN analytics.company_location cl ON cl.id_company = c.id_company 
     AND cl.city = s.raw_result->>'city' AND cl.country = s.raw_result->>'country'
 WHERE s.raw_result->>'company_name' NOT IN ('null', '', 'Empresa confidencial')
+  AND NOT EXISTS (
+      SELECT 1 FROM analytics.job_offer jo2
+      WHERE jo2.offer_url = LEFT(s.raw_result->>'offer_url', 500)
+  )
 ORDER BY LEFT(s.raw_result->>'offer_url', 500), s.collected_at DESC
 ON CONFLICT (id_offer) DO NOTHING;
