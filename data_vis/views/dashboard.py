@@ -610,16 +610,33 @@ def render_offers_table(d: pd.DataFrame) -> None:
     # ── FEATURE DÉTAILS : AFFICHAGE SOUS LE TABLEAU ──
     if new_selected:
         st.markdown("### 💡 Selected Offer Details")
+        
+        # 1. Préparer un dictionnaire pour lier un libellé clair à chaque ID d'offre
+        options_dict = {}
         for job_id in new_selected:
             match = display_df[display_df["job_id"] == job_id]
             if not match.empty:
                 selected_job = match.iloc[0]
                 title = selected_job.get("job_title", "Offer")
                 company = selected_job.get("company_name", "")
-                
-                with st.expander(f"📌 **{title}** ({company})", expanded=True):
-                    st.markdown(f"**Explanation:** {selected_job.get('explanation', 'No explanation available.')}")
-                    st.markdown(f"**Keywords:** `{selected_job.get('keywords_str', 'None')}`")
+                options_dict[job_id] = f"{title} ({company})"
+        
+        # 2. Créer le menu déroulant (selectbox) pour choisir l'offre à inspecter
+        selected_job_id_to_display = st.selectbox(
+            "Select an offer to view details:",
+            options=list(options_dict.keys()),
+            format_func=lambda x: options_dict[x],
+            key="details_offer_selector"
+        )
+        
+        # 3. Afficher uniquement les détails de l'offre sélectionnée dans le menu
+        if selected_job_id_to_display:
+            match = display_df[display_df["job_id"] == selected_job_id_to_display]
+            if not match.empty:
+                job = match.iloc[0]
+                with st.expander(f"📌 **{options_dict[selected_job_id_to_display]}**", expanded=True):
+                    st.markdown(f"**Explanation:** {job.get('explanation', 'No explanation available.')}")
+                    st.markdown(f"**Keywords:** `{job.get('keywords_str', 'None')}`")
 
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
