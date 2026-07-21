@@ -516,10 +516,15 @@ def build_map_groups(d: pd.DataFrame) -> pd.DataFrame | None:
 # Offers table (mirror-selected with the map via map_selected_job_ids)
 # ════════════════════════════════════════════════════════════════════
 def render_offers_table(d: pd.DataFrame) -> None:
-    header_col1, header_col2 = st.columns([4, 1])
+    header_col1, header_col2, header_col3 = st.columns([3, 1.5, 1])
     with header_col1:
         st.subheader("📋 Offers")
     with header_col2:
+        sort_choice = st.selectbox(
+            "Sort by", ["Relevancy ↓", "Relevancy ↑", "Company A-Z", "Most recent"],
+            key="offers_sort_choice", label_visibility="collapsed",
+        )
+    with header_col3:
         if st.button("🗑️ Clear selection", key="clear_offers_selection"):
             st.session_state["map_selected_job_ids"] = set()
             st.rerun()
@@ -532,17 +537,31 @@ def render_offers_table(d: pd.DataFrame) -> None:
         st.session_state["map_selected_job_ids"] = set()
     selected_ids = st.session_state["map_selected_job_ids"]
 
-    display_df = d.reset_index()  # job_id becomes a column
+    display_df = d.reset_index()
     if "offer_languages" in display_df.columns:
         display_df["languages"] = display_df["offer_languages"].apply(
             lambda x: ", ".join(l for l in x if isinstance(l, str)).upper() if isinstance(x, list) else ""
         )
 
+    # ── Apply the chosen sort ──
+    if sort_choice == "Relevancy ↓":
+        display_df = display_df.sort_values("score_relevancy", ascending=False)
+    elif sort_choice == "Relevancy ↑":
+        display_df = display_df.sort_values("score_relevancy", ascending=True)
+    elif sort_choice == "Company A-Z":
+        display_df = display_df.sort_values("company_name", ascending=True)
+    elif sort_choice == "Most recent" and "collected_at" in display_df.columns:
+        display_df = display_df.sort_values("collected_at", ascending=False)
+
+    # ── Selected rows always pinned to the top, regardless of sort ──
+    display_df["_is_selected"] = display_df["job_id"].isin(selected_ids)
+    display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
+
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
                              "seniority", "languages", "score_relevancy"]
                  if c in display_df.columns]
 
-    display_df.insert(0, "Select", display_df["job_id"].isin(selected_ids))
+    display_df.insert(0, "Select", display_df["_is_selected"])
 
     edited = st.data_editor(
         display_df[["Select", "job_id"] + show_cols],
@@ -554,7 +573,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
             "job_id": None,
             "job_title": st.column_config.TextColumn("Title", width="large"),
             "company_name": st.column_config.TextColumn("Company", width="small"),
-            "city": st.column_config.TextColumn("City", width="small"),
+            "city": st.column_config.TextColumn("City", width="medium"),
             "country_full": st.column_config.TextColumn("Country", width="small"),
             "seniority": st.column_config.TextColumn("Level", width="small"),
             "languages": st.column_config.TextColumn("Languages", width="small"),
@@ -581,24 +600,21 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
         st.metric("🏢 Companies", d["company_name"].nunique())
 
     # ── Map ──────────────────────────────────────────────────────
-    grouped = build_map_groups(d)  # cached heavy aggregation
+    grouped = build_map_groups(d)
 
     if grouped is None:
         st.info("No geolocated offers to display on the map.")
     else:
-        grouped = grouped.copy()  # don't mutate the cached object
+        grouped = grouped.copy()
 
         if "map_selected_job_ids" not in st.session_state:
             st.session_state["map_selected_job_ids"] = set()
         selected_ids_set = st.session_state["map_selected_job_ids"]
 
-        # Selection-dependent styling (recomputed each run — cheap)
         grouped["is_highlighted"] = grouped["job_ids"].apply(
             lambda ids: bool(selected_ids_set & set(ids))
         )
-        grouped["marker_opacity"] = grouped["is_highlighted"].map({True: 1.0, False: 0.35})
 
-        # Recenter on the selected point(s), using their barycenter + fitted zoom
         highlighted_points = grouped[grouped["is_highlighted"]]
         if not highlighted_points.empty:
             lats = highlighted_points["latitude"].tolist()
@@ -609,30 +625,41 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             map_center = dict(lat=-25, lon=-60)
             map_zoom = 3
 
-        fig_map = px.scatter_mapbox(
-            grouped,
-            lat="latitude", lon="longitude",
-            custom_data=["job_ids", "count"],
-            height=450,
-        )
-        fig_map.update_traces(
+        import plotly.graph_objects as go
+        fig_map = go.Figure()
+
+        # ── Base layer: density "glow" — large, semi-transparent circles ──
+        fig_map.add_trace(go.Scattermapbox(
+            lat=grouped["latitude"], lon=grouped["longitude"],
+            mode="markers",
             marker=dict(
-                size=10,
+                size=grouped["count"].clip(upper=10) * 4 + 10,  # bigger where offers stack
                 color=grouped["avg_score"],
                 colorscale="RdYlGn",
-                cmin=grouped["avg_score"].min(),
-                cmax=grouped["avg_score"].max(),
-                showscale=True,
-                colorbar=dict(title="Avg score"),
-                opacity=grouped["marker_opacity"],
+                cmin=grouped["avg_score"].min(), cmax=grouped["avg_score"].max(),
+                showscale=True, colorbar=dict(title="Avg score"),
+                opacity=0.35,
             ),
+            customdata=list(zip(grouped["job_ids"], grouped["count"])),
             text=grouped["hover_text"],
             hovertemplate="<b>%{customdata[1]} offer(s)</b><br>%{text}<extra></extra>",
-        )
+            name="density",
+        ))
+
+        # ── Overlay: sharp, opaque markers for the current selection ──
+        if not highlighted_points.empty:
+            fig_map.add_trace(go.Scattermapbox(
+                lat=highlighted_points["latitude"], lon=highlighted_points["longitude"],
+                mode="markers",
+                marker=dict(size=10, color="#2ECC71", opacity=1.0),
+                hoverinfo="skip",
+                showlegend=False,
+                name="selected",
+            ))
+
         fig_map.update_layout(
             mapbox=dict(
-                style="carto-darkmatter",
-                pitch=0, bearing=0,
+                style="carto-darkmatter", pitch=0, bearing=0,
                 center=map_center, zoom=map_zoom,
             ),
             margin=dict(l=0, r=0, t=0, b=0),
@@ -640,6 +667,7 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             selectdirection="any",
             clickmode="event+select",
             uirevision="offers_map",
+            showlegend=False,
         )
 
         event = st.plotly_chart(
@@ -649,12 +677,13 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             config={"scrollZoom": True, "displayModeBar": True},
         )
 
-        # Map selection replaces the current selection (mirror with the table)
         if event.selection.points:
             clicked_ids = set()
             for pt in event.selection.points:
-                clicked_ids.update(grouped.iloc[pt["point_index"]]["job_ids"])
-            if clicked_ids != st.session_state["map_selected_job_ids"]:
+                # Only trace 0 (density/base layer) carries the real job_ids to click on
+                if pt.get("curve_number", 0) == 0:
+                    clicked_ids.update(grouped.iloc[pt["point_index"]]["job_ids"])
+            if clicked_ids and clicked_ids != st.session_state["map_selected_job_ids"]:
                 st.session_state["map_selected_job_ids"] = clicked_ids
                 st.rerun()
         else:
