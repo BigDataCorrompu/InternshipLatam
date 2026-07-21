@@ -721,12 +721,20 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             name="density",
         ))
 
-        # ── Overlay: sharp, opaque markers for the current selection ──
+        # ── Overlay: sharp, opaque markers for the current selection — SAME color scale as base ──
         if not highlighted_points.empty:
             fig_map.add_trace(go.Scattermapbox(
                 lat=highlighted_points["latitude"], lon=highlighted_points["longitude"],
                 mode="markers",
-                marker=dict(size=10, color="#2ECC71", opacity=1.0),
+                marker=dict(
+                    size=10,
+                    color=highlighted_points["avg_score"],
+                    colorscale="RdYlGn",
+                    cmin=grouped["avg_score"].min(),   # mêmes bornes que la trace de base
+                    cmax=grouped["avg_score"].max(),   # pour que les couleurs correspondent visuellement
+                    showscale=False,                    # pas de 2e colorbar dupliquée
+                    opacity=1.0,
+                ),
                 hoverinfo="skip",
                 showlegend=False,
                 name="selected",
