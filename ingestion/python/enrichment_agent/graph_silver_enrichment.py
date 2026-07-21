@@ -94,7 +94,7 @@ find_mails = FindMails(llm=llm)
 
 # =========================== Attributes handle ===========================
 class OfferAttribute(BaseModel):
-    seniority: Literal["intern", "junior", "mid", "senior", "unknown"] = Field(
+    seniority: Literal["junior", "mid", "senior", "unknown"] = Field(
         description=(
             "Seniority level required for the position. "
             "ALWAYS try to infer it, even if not explicitly stated: "
