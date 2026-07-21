@@ -24,7 +24,7 @@ import time
 import importlib.util
 from collections import defaultdict
 from pathlib import Path
-
+import plotly.graph_objects as go
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -576,8 +576,6 @@ def render_offers_table(d: pd.DataFrame) -> None:
 
     # ── FEATURE SÉLECTION & TRI EN HAUT RÉACTIVÉ ──
     display_df["_is_selected"] = display_df["job_id"].isin(selected_ids)
-    
-    # ✅ ON REMET LE TRI : Les cases cochées sautent en priorité tout en haut !
     display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
 
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
@@ -586,8 +584,23 @@ def render_offers_table(d: pd.DataFrame) -> None:
 
     display_df.insert(0, "Select", display_df["_is_selected"])
 
+    # ── NOUVEAU : MARQUAGE VISUEL DE L'OFFRE INSPECTÉE DANS LE TABLEAU ──
+    # On crée une copie temporaire pour l'affichage du tableau
+    table_to_edit = display_df[["Select", "job_id"] + show_cols].copy()
+    
+    # On récupère l'ID de l'offre actuellement choisie dans le menu déroulant du bas
+    active_job_id = st.session_state.get("details_offer_selector")
+    
+    if active_job_id and "job_title" in table_to_edit.columns:
+        # On ajoute un pointeur bien visible (👉 🔍) devant le titre du poste actif !
+        table_to_edit["job_title"] = table_to_edit.apply(
+            lambda r: f"👉 🔍 {r['job_title']}" if r["job_id"] == active_job_id else r["job_title"],
+            axis=1
+        )
+
+    # On passe table_to_edit (et non plus display_df) au data_editor
     edited = st.data_editor(
-        display_df[["Select", "job_id"] + show_cols],
+        table_to_edit,
         hide_index=True,
         width="stretch",
         disabled=show_cols + ["job_id"],
@@ -609,12 +622,8 @@ def render_offers_table(d: pd.DataFrame) -> None:
     new_selected = set(edited.loc[edited["Select"], "job_id"].tolist())
     if new_selected != selected_ids:
         st.session_state["map_selected_job_ids"] = new_selected
-        
-        # ✅ ASTUCE ANTI-BUG : On supprime la mémoire interne des numéros de lignes du tableau 
-        # juste avant le rerun pour qu'il s'adapte au nouveau tri sans se tromper de ligne !
         if "offers_editor" in st.session_state:
             del st.session_state["offers_editor"]
-            
         st.rerun()
 
     # ── FEATURE DÉTAILS : AFFICHAGE SOUS LE TABLEAU ──
@@ -700,7 +709,7 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             map_center = dict(lat=-25, lon=-60)
             map_zoom = 3
 
-        import plotly.graph_objects as go
+        
         fig_map = go.Figure()
 
         # ── Base layer: density "glow" — large, semi-transparent circles ──
