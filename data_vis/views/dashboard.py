@@ -611,16 +611,16 @@ def render_offers_table(d: pd.DataFrame) -> None:
     if new_selected:
         st.markdown("### 💡 Selected Offer Details")
         
-        # 1. Fonction pour mapper le score sur le code couleur de la carte (0 à 10)
-        def get_score_color(score):
+        # 1. Fonction pour renvoyer la couleur Streamlit ET l'émoji pour le menu
+        def get_score_visuals(score):
             if score >= 7:
-                return "green"   # Vert pour les scores élevés (7 à 10)
+                return "green", "🟢"   # Vert pour les scores >= 7
             elif score >= 4:
-                return "orange"  # Orange/Jaune pour les scores moyens (4 à 7)
+                return "orange", "🟡"  # Jaune/Orange pour les scores entre 4 et 7
             else:
-                return "red"     # Rouge pour les scores bas (< 4)
+                return "red", "🔴"     # Rouge pour les scores < 4
 
-        # 2. Préparer le dictionnaire pour le menu déroulant
+        # 2. Préparer le dictionnaire avec la puce de couleur dans le texte
         options_dict = {}
         for job_id in new_selected:
             match = display_df[display_df["job_id"] == job_id]
@@ -630,8 +630,10 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 company = selected_job.get("company_name", "")
                 score = selected_job.get("score_relevancy", 0)
                 
-                # Format compact dans le menu déroulant (texte brut obligatoire ici)
-                options_dict[job_id] = f"[{score}/10] {title} ({company})"
+                _, emoji = get_score_visuals(score)
+                
+                # On ajoute l'émoji directement dans le libellé du menu déroulant !
+                options_dict[job_id] = f"{emoji} [{score}/10] {title} ({company})"
         
         # 3. Menu déroulant pour sélectionner l'offre
         selected_job_id_to_display = st.selectbox(
@@ -641,7 +643,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
             key="details_offer_selector"
         )
         
-        # 4. Affichage avec la note EN GRAS et COLORÉE selon la carte
+        # 4. Affichage des détails sous le menu
         if selected_job_id_to_display:
             match = display_df[display_df["job_id"] == selected_job_id_to_display]
             if not match.empty:
@@ -650,10 +652,9 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 company = job.get("company_name", "")
                 score = job.get("score_relevancy", 0)
                 
-                # On récupère la couleur correspondante (green, orange ou red)
-                color = get_score_color(score)
+                color, _ = get_score_visuals(score)
                 
-                # Application de la couleur et du gras en format compact : :green[**[8/10]**]
+                # Le titre de l'expander garde son formatage couleur Markdown
                 expander_title = f"📌 :{color}[**[{score}/10]**] **{title}** ({company})"
                 
                 with st.expander(expander_title, expanded=True):
