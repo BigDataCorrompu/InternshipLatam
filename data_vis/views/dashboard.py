@@ -527,6 +527,8 @@ def render_offers_table(d: pd.DataFrame) -> None:
     with header_col3:
         if st.button("🗑️ Clear selection", key="clear_offers_selection"):
             st.session_state["map_selected_job_ids"] = set()
+            if "selected_offer_detail" in st.session_state:
+                del st.session_state["selected_offer_detail"]
             st.rerun()
 
     if d.empty:
@@ -543,18 +545,17 @@ def render_offers_table(d: pd.DataFrame) -> None:
             lambda x: ", ".join(l for l in x if isinstance(l, str)).upper() if isinstance(x, list) else ""
         )
 
-    # ── Keywords as a joined string, for the same native hover/expand behavior ──
+    # ── Keywords as a joined string ──
     if "all_keywords" in display_df.columns:
         display_df["keywords_str"] = display_df["all_keywords"].apply(
             lambda x: ", ".join(sorted(set(k for k in x if isinstance(k, str)))) if isinstance(x, list) else ""
         )
 
-    # ── Date: published_at, fallback to collected_at if missing or implausible ──
+    # ── Date: published_at, fallback to collected_at ──
     if "published_at" in display_df.columns:
         published = pd.to_datetime(display_df["published_at"], errors="coerce")
         collected = pd.to_datetime(display_df.get("collected_at"), errors="coerce")
 
-        # Treat as invalid if missing, or outside a plausible range (e.g. bad parsing)
         today = pd.Timestamp.now(tz=published.dt.tz if published.dt.tz else None)
         is_valid = published.notna() & (published >= pd.Timestamp("2015-01-01", tz=published.dt.tz)) & (published <= today)
 
@@ -575,18 +576,21 @@ def render_offers_table(d: pd.DataFrame) -> None:
     display_df["_is_selected"] = display_df["job_id"].isin(selected_ids)
     display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
 
+    # ── REMARQUE : On a supprimé "explanation" et "keywords_str" des colonnes affichées ! ──
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
-                             "seniority", "languages", "date", "score_relevancy",
-                             "explanation", "keywords_str"]
+                             "seniority", "languages", "date", "score_relevancy"]
                  if c in display_df.columns]
 
     display_df.insert(0, "Select", display_df["_is_selected"])
 
+    # On utilise le `on_select="rerun"` natif de Streamlit (disponible sur data_editor/dataframe)
     edited = st.data_editor(
         display_df[["Select", "job_id"] + show_cols],
         hide_index=True,
         width="stretch",
         disabled=show_cols + ["job_id"],
+        on_select="rerun",  # Permet de détecter le clic sur une ligne / cellule !
+        selection_mode="row",
         column_config={
             "Select": st.column_config.CheckboxColumn("", width="small"),
             "job_id": None,
@@ -598,16 +602,27 @@ def render_offers_table(d: pd.DataFrame) -> None:
             "languages": st.column_config.TextColumn("Languages", width="small"),
             "date": st.column_config.TextColumn("Collected", width="small"),
             "score_relevancy": st.column_config.NumberColumn("Relevancy", width="small"),
-            "explanation": st.column_config.TextColumn("Why this score?", width="small"),
-            "keywords_str": st.column_config.TextColumn("Keywords", width="small"),
         },
         key="offers_editor",
     )
 
+    # Gestion de la sélection par les cases à cocher
     new_selected = set(edited.loc[edited["Select"], "job_id"].tolist())
     if new_selected != selected_ids:
         st.session_state["map_selected_job_ids"] = new_selected
         st.rerun()
+
+    # ── AFFICHAGE DE L'EXPLICATION ET DES MOTS-CLÉS SUR LE CLIC D'UNE LIGNE ──
+    # Si l'utilisateur a cliqué sur une ligne du tableau :
+    selected_rows = st.session_state.get("offers_editor", {}).get("selection", {}).get("rows", [])
+    if selected_rows:
+        row_idx = selected_rows[0]
+        selected_job = display_df.iloc[row_idx]
+        
+        # Affichage élégant dans un conteneur (pas de nouvelles colonnes dans le tableau)
+        with st.expander(f"💡 Details & Keywords for: **{selected_job.get('job_title', 'Offer')}** ({selected_job.get('company_name', '')})", expanded=True):
+            st.markdown(f"**Explanation:** {selected_job.get('explanation', 'No explanation available.')}")
+            st.markdown(f"**Keywords:** `{selected_job.get('keywords_str', 'None')}`")
 
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
