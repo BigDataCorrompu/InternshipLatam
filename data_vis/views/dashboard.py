@@ -611,7 +611,16 @@ def render_offers_table(d: pd.DataFrame) -> None:
     if new_selected:
         st.markdown("### 💡 Selected Offer Details")
         
-        # 1. Préparer un dictionnaire pour lier un libellé clair à chaque ID d'offre
+        # 1. Fonction pour mapper le score sur le code couleur de la carte (0 à 10)
+        def get_score_color(score):
+            if score >= 7:
+                return "green"   # Vert pour les scores élevés (7 à 10)
+            elif score >= 4:
+                return "orange"  # Orange/Jaune pour les scores moyens (4 à 7)
+            else:
+                return "red"     # Rouge pour les scores bas (< 4)
+
+        # 2. Préparer le dictionnaire pour le menu déroulant
         options_dict = {}
         for job_id in new_selected:
             match = display_df[display_df["job_id"] == job_id]
@@ -619,9 +628,12 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 selected_job = match.iloc[0]
                 title = selected_job.get("job_title", "Offer")
                 company = selected_job.get("company_name", "")
-                options_dict[job_id] = f"{title} ({company})"
+                score = selected_job.get("score_relevancy", 0)
+                
+                # Format compact dans le menu déroulant (texte brut obligatoire ici)
+                options_dict[job_id] = f"[{score}/10] {title} ({company})"
         
-        # 2. Créer le menu déroulant (selectbox) pour choisir l'offre à inspecter
+        # 3. Menu déroulant pour sélectionner l'offre
         selected_job_id_to_display = st.selectbox(
             "Select an offer to view details:",
             options=list(options_dict.keys()),
@@ -629,12 +641,22 @@ def render_offers_table(d: pd.DataFrame) -> None:
             key="details_offer_selector"
         )
         
-        # 3. Afficher uniquement les détails de l'offre sélectionnée dans le menu
+        # 4. Affichage avec la note EN GRAS et COLORÉE selon la carte
         if selected_job_id_to_display:
             match = display_df[display_df["job_id"] == selected_job_id_to_display]
             if not match.empty:
                 job = match.iloc[0]
-                with st.expander(f"📌 **{options_dict[selected_job_id_to_display]}**", expanded=True):
+                title = job.get("job_title", "Offer")
+                company = job.get("company_name", "")
+                score = job.get("score_relevancy", 0)
+                
+                # On récupère la couleur correspondante (green, orange ou red)
+                color = get_score_color(score)
+                
+                # Application de la couleur et du gras en format compact : :green[**[8/10]**]
+                expander_title = f"📌 :{color}[**[{score}/10]**] **{title}** ({company})"
+                
+                with st.expander(expander_title, expanded=True):
                     st.markdown(f"**Explanation:** {job.get('explanation', 'No explanation available.')}")
                     st.markdown(f"**Keywords:** `{job.get('keywords_str', 'None')}`")
 
