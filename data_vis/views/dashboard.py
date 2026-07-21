@@ -516,6 +516,10 @@ def build_map_groups(d: pd.DataFrame) -> pd.DataFrame | None:
 # Offers table (mirror-selected with the map via map_selected_job_ids)
 # ════════════════════════════════════════════════════════════════════
 def render_offers_table(d: pd.DataFrame) -> None:
+    if "map_selected_job_ids" not in st.session_state:
+        st.session_state["map_selected_job_ids"] = set()
+    selected_ids = st.session_state["map_selected_job_ids"]
+    
     header_col1, header_col2, header_col3 = st.columns([3, 1.5, 1])
     with header_col1:
         st.subheader("📋 Offers")
