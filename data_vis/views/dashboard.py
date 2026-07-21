@@ -683,6 +683,22 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
     with metric_col2:
         st.metric("🏢 Companies", d["company_name"].nunique())
 
+    # ── If a map/table selection is active, restrict all analysis
+    # (charts, skills, company list) to that subset. The offers TABLE
+    # itself keeps showing everything, so the user can still see and
+    # adjust the selection. ──
+    if "map_selected_job_ids" not in st.session_state:
+        st.session_state["map_selected_job_ids"] = set()
+    selected_ids = st.session_state["map_selected_job_ids"]
+
+    if selected_ids:
+        d_analysis = d[d.index.isin(selected_ids)]
+        d_company_base = d_filtered_without_company[d_filtered_without_company.index.isin(selected_ids)]
+        st.info(f"📍 Charts below reflect your **{len(d_analysis)} selected offer(s)**, not the full filtered set.")
+    else:
+        d_analysis = d
+        d_company_base = d_filtered_without_company
+
     # ── Map ──────────────────────────────────────────────────────
     grouped = build_map_groups(d)
 
@@ -787,15 +803,14 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
     # ── Country pie + language bar ───────────────────────────────
     col1, col2 = st.columns(2)
     with col1:
-        country_counts = group_small_categories(d["country_full"].value_counts()).reset_index()
+        country_counts = group_small_categories(d_analysis["country_full"].value_counts()).reset_index()
         country_counts.columns = ["country", "count"]
         st.plotly_chart(
             px.pie(country_counts, names="country", values="count", title="Offers by country"),
             width="stretch",
         )
     with col2:
-        # Bar chart, not pie: an offer can have several languages, so pie % wouldn't sum to 100%.
-        lang_counts = d["offer_languages_full"].dropna().explode().dropna()
+        lang_counts = d_analysis["offer_languages_full"].dropna().explode().dropna()
         lang_counts = lang_counts[
             ~lang_counts.astype(str).str.strip().str.lower().isin(["none", "nan", ""])
         ]
@@ -810,7 +825,7 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
     # ── Seniority pie + top skills bar ───────────────────────────
     col3, col4 = st.columns(2)
     with col3:
-        seniority_counts = d["seniority"].value_counts().reset_index()
+        seniority_counts = d_analysis["seniority"].value_counts().reset_index()
         seniority_counts.columns = ["seniority", "count"]
         st.plotly_chart(
             px.pie(seniority_counts, names="seniority", values="count", title="Offers by seniority"),
@@ -826,8 +841,8 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
         }
         records = []
         for label, col in KEYWORD_CATEGORIES.items():
-            if col in d.columns:
-                exploded = d[col].dropna().explode().dropna()
+            if col in d_analysis.columns:
+                exploded = d_analysis[col].dropna().explode().dropna()
                 exploded = exploded[exploded.apply(lambda x: isinstance(x, str))]
                 exploded = exploded[exploded.str.strip() != ""]
                 for kw in exploded:
@@ -852,11 +867,9 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
 
     # ── Company poster table (checkbox-selectable, mirrors f["companies"]) ──
     st.markdown("**🏆 Job posters companies**")
-
-    # Built from data filtered by everything EXCEPT company, so checking one
-    # company doesn't make the others disappear from the list.
-    d_base = d_filtered_without_company
+    d_base = d_company_base   # ← au lieu de d_filtered_without_company directement
     d_with_site = d_base[d_base["website"].notna() & (d_base["website"] != "")]
+
 
     company_count = d_with_site["company_name"].value_counts().reset_index()
     company_count.columns = ["company_name", "nb_offers"]
