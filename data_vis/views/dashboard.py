@@ -543,6 +543,12 @@ def render_offers_table(d: pd.DataFrame) -> None:
             lambda x: ", ".join(l for l in x if isinstance(l, str)).upper() if isinstance(x, list) else ""
         )
 
+    # ── Keywords as a joined string, for the same native hover/expand behavior ──
+    if "all_keywords" in display_df.columns:
+        display_df["keywords_str"] = display_df["all_keywords"].apply(
+            lambda x: ", ".join(sorted(set(k for k in x if isinstance(k, str)))) if isinstance(x, list) else ""
+        )
+
     # ── Date: published_at, fallback to collected_at if missing or implausible ──
     if "published_at" in display_df.columns:
         published = pd.to_datetime(display_df["published_at"], errors="coerce")
@@ -570,7 +576,8 @@ def render_offers_table(d: pd.DataFrame) -> None:
     display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
 
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
-                             "seniority", "languages", "date", "score_relevancy"]
+                             "seniority", "languages", "date", "score_relevancy",
+                             "explanation", "keywords_str"]
                  if c in display_df.columns]
 
     display_df.insert(0, "Select", display_df["_is_selected"])
@@ -591,6 +598,8 @@ def render_offers_table(d: pd.DataFrame) -> None:
             "languages": st.column_config.TextColumn("Languages", width="small"),
             "date": st.column_config.TextColumn("Collected", width="small"),
             "score_relevancy": st.column_config.NumberColumn("Relevancy", width="small"),
+            "explanation": st.column_config.TextColumn("Why this score?", width="small"),
+            "keywords_str": st.column_config.TextColumn("Keywords", width="small"),
         },
         key="offers_editor",
     )
@@ -599,36 +608,6 @@ def render_offers_table(d: pd.DataFrame) -> None:
     if new_selected != selected_ids:
         st.session_state["map_selected_job_ids"] = new_selected
         st.rerun()
-
-    # ── Offer detail viewer — keywords + hover tooltip for explanation ──
-    st.markdown("**🔍 Why this score?**")
-    offer_labels = {
-        row["job_id"]: f"{row['job_title']} @ {row['company_name']}"
-        for _, row in display_df.iterrows()
-    }
-    if offer_labels:
-        chosen_id = st.selectbox(
-            "Select an offer to see details",
-            options=list(offer_labels.keys()),
-            format_func=lambda jid: offer_labels[jid],
-            key="detail_offer_select",
-            label_visibility="collapsed",
-        )
-        offer_row = display_df[display_df["job_id"] == chosen_id].iloc[0]
-        explanation = offer_row.get("explanation")
-        explanation_text = explanation if isinstance(explanation, str) else "Not available."
-        # HTML `title` attribute = native browser tooltip on hover, no click needed
-        safe_explanation = explanation_text.replace('"', "&quot;")
-
-        keywords = offer_row.get("all_keywords", [])
-        keywords_str = ", ".join(sorted(set(k for k in keywords if isinstance(k, str)))) if isinstance(keywords, list) else ""
-
-        st.markdown(
-            f"**Score:** {offer_row.get('score_relevancy', 'N/A')} "
-            f'<span title="{safe_explanation}" style="cursor: help; color: #888;">ℹ️ hover for explanation</span>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(f"**Keywords:** {keywords_str or '*None extracted*'}")
 
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
