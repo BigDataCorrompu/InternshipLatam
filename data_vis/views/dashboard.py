@@ -25,6 +25,7 @@ import importlib.util
 from collections import defaultdict
 from pathlib import Path
 import plotly.graph_objects as go
+import plotly.colors as pc
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -268,6 +269,7 @@ def get_filter_options(df: pd.DataFrame, dict_reversed_index: dict) -> dict:
     }
 
 
+
 # ════════════════════════════════════════════════════════════════════
 # Load data & derive shared constants
 # ════════════════════════════════════════════════════════════════════
@@ -487,6 +489,8 @@ def compute_zoom_for_bounds(lats, lons, padding_factor: float = 1.3) -> float:
         return 8
     zoom = 8 - np.log2(max_range + 0.01)
     return max(2, min(zoom, 10))
+
+
 
 
 @st.cache_data
@@ -746,16 +750,18 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
         fig_map = go.Figure()
 
         # ── Base layer: density "glow" — large, semi-transparent circles ──
+        # ── Base layer: density "glow" — fades further once a selection is active ──
+        base_opacity = 0.15 if not highlighted_points.empty else 0.35
         fig_map.add_trace(go.Scattermapbox(
             lat=grouped["latitude"], lon=grouped["longitude"],
             mode="markers",
             marker=dict(
-                size=grouped["count"].clip(upper=10) * 4 + 10,  # bigger where offers stack
+                size=grouped["count"].clip(upper=10) * 4 + 10,
                 color=grouped["avg_score"],
                 colorscale="RdYlGn",
                 cmin=grouped["avg_score"].min(), cmax=grouped["avg_score"].max(),
                 showscale=True, colorbar=dict(title="Avg score"),
-                opacity=0.35,
+                opacity=base_opacity,
             ),
             customdata=list(zip(grouped["job_ids"], grouped["count"])),
             text=grouped["hover_text"],
