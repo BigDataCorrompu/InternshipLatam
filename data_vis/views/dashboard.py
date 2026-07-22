@@ -184,9 +184,11 @@ def convert_language_list(code_list) -> list:
 # Main load + transform (cached — the expensive one-time preparation)
 # ════════════════════════════════════════════════════════════════════
 @st.cache_data
-def load_and_transform_dataframe() -> tuple[pd.DataFrame, dict]:
+def load_and_transform_dataframe(fingerprint: str) -> tuple[pd.DataFrame, dict]:
     """Load raw offers, clean, enrich (country/language full names, keyword blob),
     and build the reverse index. Everything downstream reads from this cached result."""
+    fingerprint = get_data_fingerprint()
+    df = pd.DataFrame(load_real_offers(fingerprint))
     df = pd.DataFrame(load_real_offers())
     df.set_index("job_id", inplace=True)
 
@@ -270,7 +272,8 @@ def get_filter_options(df: pd.DataFrame, dict_reversed_index: dict) -> dict:
 # ════════════════════════════════════════════════════════════════════
 # Load data & derive shared constants
 # ════════════════════════════════════════════════════════════════════
-df, dict_reversed_index = load_and_transform_dataframe()
+fingerprint = get_data_fingerprint()
+df, dict_reversed_index = load_and_transform_dataframe(fingerprint)
 filters = get_filter_options(df, dict_reversed_index)
 city_country_map = build_city_country_map(df)
 
