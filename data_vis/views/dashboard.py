@@ -490,7 +490,15 @@ def compute_zoom_for_bounds(lats, lons, padding_factor: float = 1.3) -> float:
     zoom = 8 - np.log2(max_range + 0.01)
     return max(2, min(zoom, 10))
 
+def _score_to_rgb(score, vmin, vmax):
+    t = 0.5 if vmax == vmin else max(0, min(1, (score - vmin) / (vmax - vmin)))
+    return pc.sample_colorscale("RdYlGn", [t])[0]  # ex: "rgb(200,50,30)"
 
+
+def _blend_grey(rgb_str, weight=0.25):
+    """weight=0 -> pure grey, weight=1 -> original color untouched."""
+    r, g, b = pc.unlabel_rgb(rgb_str)
+    return f"rgb({r*weight + 128*(1-weight):.0f},{g*weight + 128*(1-weight):.0f},{b*weight + 128*(1-weight):.0f})"
 
 
 @st.cache_data
@@ -750,17 +758,36 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
         fig_map = go.Figure()
 
         # ── Base layer: density "glow" — large, semi-transparent circles ──
-        # ── Base layer: density "glow" — fades further once a selection is active ──
-        base_opacity = 0.15 if not highlighted_points.empty else 0.35
+        vmin, vmax = grouped["avg_score"].min(), grouped["avg_score"].max()
+
+        if highlighted_points.empty:
+            # No selection: keep the normal color-scaled behavior, colorbar included.
+            base_color = grouped["avg_score"]
+            base_colorscale = "RdYlGn"
+            base_showscale = True
+            base_opacity = 0.35
+        else:
+            # A selection is active: grey out + fade everything NOT selected.
+            grouped["_rgb"] = grouped["avg_score"].apply(lambda s: _score_to_rgb(s, vmin, vmax))
+            grouped["_final_color"] = grouped.apply(
+                lambda row: row["_rgb"] if row["is_highlighted"] else _blend_grey(row["_rgb"], weight=0.25),
+                axis=1,
+            )
+            base_color = grouped["_final_color"]
+            base_colorscale = None
+            base_showscale = False
+            base_opacity = grouped["is_highlighted"].map({True: 1.0, False: 0.25})
+
         fig_map.add_trace(go.Scattermapbox(
             lat=grouped["latitude"], lon=grouped["longitude"],
             mode="markers",
             marker=dict(
                 size=grouped["count"].clip(upper=10) * 4 + 10,
-                color=grouped["avg_score"],
-                colorscale="RdYlGn",
-                cmin=grouped["avg_score"].min(), cmax=grouped["avg_score"].max(),
-                showscale=True, colorbar=dict(title="Avg score"),
+                color=base_color,
+                colorscale=base_colorscale,
+                cmin=vmin, cmax=vmax,
+                showscale=base_showscale,
+                colorbar=dict(title="Avg score") if base_showscale else None,
                 opacity=base_opacity,
             ),
             customdata=list(zip(grouped["job_ids"], grouped["count"])),
