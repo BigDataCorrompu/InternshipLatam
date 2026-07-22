@@ -24,7 +24,7 @@ import time
 import importlib.util
 from collections import defaultdict
 from pathlib import Path
-import plotly.graph_objects as go
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -527,28 +527,13 @@ def build_map_groups(d: pd.DataFrame) -> pd.DataFrame | None:
 # Offers table (mirror-selected with the map via map_selected_job_ids)
 # ════════════════════════════════════════════════════════════════════
 def render_offers_table(d: pd.DataFrame) -> None:
-    if "map_selected_job_ids" not in st.session_state:
-        st.session_state["map_selected_job_ids"] = set()
-    selected_ids = st.session_state["map_selected_job_ids"]
-    
-    header_col1, header_col2, header_col3 = st.columns([3, 1.5, 1])
+    header_col1, header_col2 = st.columns([4, 1])
     with header_col1:
         st.subheader("📋 Offers")
     with header_col2:
-        sort_choice = st.selectbox(
-            "Sort by", ["Relevancy ↓", "Relevancy ↑", "Company A-Z", "Most recent"],
-            key="offers_sort_choice", label_visibility="collapsed",
-        )
-    with header_col3:
         if st.button("🗑️ Clear selection", key="clear_offers_selection"):
             st.session_state["map_selected_job_ids"] = set()
-            # On vide aussi le cache du tableau lors du clear
-            if "offers_editor" in st.session_state:
-                del st.session_state["offers_editor"]
             st.rerun()
-
-    if selected_ids:
-        st.info(f"📍 Charts below reflect your **{len(selected_ids)} selected offer(s)**, not the full filtered set.")
 
     if d.empty:
         st.info("No offers to display.")
@@ -558,80 +543,32 @@ def render_offers_table(d: pd.DataFrame) -> None:
         st.session_state["map_selected_job_ids"] = set()
     selected_ids = st.session_state["map_selected_job_ids"]
 
-    display_df = d.reset_index()
+    display_df = d.reset_index()  # job_id becomes a column
     if "offer_languages" in display_df.columns:
         display_df["languages"] = display_df["offer_languages"].apply(
             lambda x: ", ".join(l for l in x if isinstance(l, str)).upper() if isinstance(x, list) else ""
         )
 
-    # ── Keywords as a joined string ──
-    if "all_keywords" in display_df.columns:
-        display_df["keywords_str"] = display_df["all_keywords"].apply(
-            lambda x: ", ".join(sorted(set(k for k in x if isinstance(k, str)))) if isinstance(x, list) else ""
-        )
-
-    # ── Date: published_at, fallback to collected_at ──
-    if "published_at" in display_df.columns:
-        published = pd.to_datetime(display_df["published_at"], errors="coerce")
-        collected = pd.to_datetime(display_df.get("collected_at"), errors="coerce")
-
-        today = pd.Timestamp.now(tz=published.dt.tz if published.dt.tz else None)
-        is_valid = published.notna() & (published >= pd.Timestamp("2015-01-01", tz=published.dt.tz)) & (published <= today)
-
-        display_df["date"] = published.where(is_valid, collected)
-        display_df["date"] = display_df["date"].dt.strftime("%Y-%m-%d")
-    elif "collected_at" in display_df.columns:
-        display_df["date"] = display_df["collected_at"].dt.strftime("%Y-%m-%d")
-
-    if sort_choice == "Relevancy ↓":
-        display_df = display_df.sort_values("score_relevancy", ascending=False)
-    elif sort_choice == "Relevancy ↑":
-        display_df = display_df.sort_values("score_relevancy", ascending=True)
-    elif sort_choice == "Company A-Z":
-        display_df = display_df.sort_values("company_name", ascending=True)
-    elif sort_choice == "Most recent" and "collected_at" in display_df.columns:
-        display_df = display_df.sort_values("collected_at", ascending=False)
-
-    # ── FEATURE SÉLECTION & TRI EN HAUT RÉACTIVÉ ──
-    display_df["_is_selected"] = display_df["job_id"].isin(selected_ids)
-    display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
-
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
-                             "seniority", "languages", "date", "score_relevancy"]
+                             "seniority", "languages", "score_relevancy"]
                  if c in display_df.columns]
 
-    display_df.insert(0, "Select", display_df["_is_selected"])
+    display_df.insert(0, "Select", display_df["job_id"].isin(selected_ids))
 
-    # ── NOUVEAU : MARQUAGE VISUEL DE L'OFFRE INSPECTÉE DANS LE TABLEAU ──
-    # On crée une copie temporaire pour l'affichage du tableau
-    table_to_edit = display_df[["Select", "job_id"] + show_cols].copy()
-    
-    # On récupère l'ID de l'offre actuellement choisie dans le menu déroulant du bas
-    active_job_id = st.session_state.get("details_offer_selector")
-    
-    if active_job_id and "job_title" in table_to_edit.columns:
-        # On ajoute un pointeur bien visible (👉 🔍) devant le titre du poste actif !
-        table_to_edit["job_title"] = table_to_edit.apply(
-            lambda r: f"👉 🔍 {r['job_title']}" if r["job_id"] == active_job_id else r["job_title"],
-            axis=1
-        )
-
-    # On passe table_to_edit (et non plus display_df) au data_editor
     edited = st.data_editor(
-        table_to_edit,
+        display_df[["Select", "job_id"] + show_cols],
         hide_index=True,
         width="stretch",
         disabled=show_cols + ["job_id"],
         column_config={
-            "Select": st.column_config.CheckboxColumn("Détails", width="small"),
+            "Select": st.column_config.CheckboxColumn("", width="small"),
             "job_id": None,
             "job_title": st.column_config.TextColumn("Title", width="large"),
             "company_name": st.column_config.TextColumn("Company", width="small"),
-            "city": st.column_config.TextColumn("City", width="medium"),
+            "city": st.column_config.TextColumn("City", width="small"),
             "country_full": st.column_config.TextColumn("Country", width="small"),
             "seniority": st.column_config.TextColumn("Level", width="small"),
             "languages": st.column_config.TextColumn("Languages", width="small"),
-            "date": st.column_config.TextColumn("Collected", width="small"),
             "score_relevancy": st.column_config.NumberColumn("Relevancy", width="small"),
         },
         key="offers_editor",
@@ -640,55 +577,8 @@ def render_offers_table(d: pd.DataFrame) -> None:
     new_selected = set(edited.loc[edited["Select"], "job_id"].tolist())
     if new_selected != selected_ids:
         st.session_state["map_selected_job_ids"] = new_selected
-        if "offers_editor" in st.session_state:
-            del st.session_state["offers_editor"]
         st.rerun()
 
-    # ── FEATURE DÉTAILS : AFFICHAGE SOUS LE TABLEAU ──
-    if new_selected:
-        st.markdown("### 💡 Selected Offer Details")
-        
-        def get_score_visuals(score):
-            if score >= 7:
-                return "green", "🟢"
-            elif score >= 4:
-                return "orange", "🟡"
-            else:
-                return "red", "🔴"
-
-        options_dict = {}
-        for job_id in new_selected:
-            match = display_df[display_df["job_id"] == job_id]
-            if not match.empty:
-                selected_job = match.iloc[0]
-                title = selected_job.get("job_title", "Offer")
-                company = selected_job.get("company_name", "")
-                score = selected_job.get("score_relevancy", 0)
-                
-                _, emoji = get_score_visuals(score)
-                options_dict[job_id] = f"{emoji} [{score}/10] {title} ({company})"
-        
-        selected_job_id_to_display = st.selectbox(
-            "Select an offer to view details:",
-            options=list(options_dict.keys()),
-            format_func=lambda x: options_dict[x],
-            key="details_offer_selector"
-        )
-        
-        if selected_job_id_to_display:
-            match = display_df[display_df["job_id"] == selected_job_id_to_display]
-            if not match.empty:
-                job = match.iloc[0]
-                title = job.get("job_title", "Offer")
-                company = job.get("company_name", "")
-                score = job.get("score_relevancy", 0)
-                
-                color, _ = get_score_visuals(score)
-                expander_title = f"📌 :{color}[**[{score}/10]**] **{title}** ({company})"
-                
-                with st.expander(expander_title, expanded=True):
-                    st.markdown(f"**Explanation:** {job.get('explanation', 'No explanation available.')}")
-                    st.markdown(f"**Keywords:** `{job.get('keywords_str', 'None')}`")
 
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
@@ -701,37 +591,25 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
     with metric_col2:
         st.metric("🏢 Companies", d["company_name"].nunique())
 
-    # ── If a map/table selection is active, restrict all analysis
-    # (charts, skills, company list) to that subset. The offers TABLE
-    # itself keeps showing everything, so the user can still see and
-    # adjust the selection. ──
-    if "map_selected_job_ids" not in st.session_state:
-        st.session_state["map_selected_job_ids"] = set()
-    selected_ids = st.session_state["map_selected_job_ids"]
-
-    if selected_ids:
-        d_analysis = d[d.index.isin(selected_ids)]
-        d_company_base = d_filtered_without_company[d_filtered_without_company.index.isin(selected_ids)]
-    else:
-        d_analysis = d
-        d_company_base = d_filtered_without_company
-
     # ── Map ──────────────────────────────────────────────────────
-    grouped = build_map_groups(d)
+    grouped = build_map_groups(d)  # cached heavy aggregation
 
     if grouped is None:
         st.info("No geolocated offers to display on the map.")
     else:
-        grouped = grouped.copy()
+        grouped = grouped.copy()  # don't mutate the cached object
 
         if "map_selected_job_ids" not in st.session_state:
             st.session_state["map_selected_job_ids"] = set()
         selected_ids_set = st.session_state["map_selected_job_ids"]
 
+        # Selection-dependent styling (recomputed each run — cheap)
         grouped["is_highlighted"] = grouped["job_ids"].apply(
             lambda ids: bool(selected_ids_set & set(ids))
         )
+        grouped["marker_opacity"] = grouped["is_highlighted"].map({True: 1.0, False: 0.35})
 
+        # Recenter on the selected point(s), using their barycenter + fitted zoom
         highlighted_points = grouped[grouped["is_highlighted"]]
         if not highlighted_points.empty:
             lats = highlighted_points["latitude"].tolist()
@@ -742,49 +620,30 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             map_center = dict(lat=-25, lon=-60)
             map_zoom = 3
 
-        
-        fig_map = go.Figure()
-
-        # ── Base layer: density "glow" — large, semi-transparent circles ──
-        fig_map.add_trace(go.Scattermapbox(
-            lat=grouped["latitude"], lon=grouped["longitude"],
-            mode="markers",
+        fig_map = px.scatter_mapbox(
+            grouped,
+            lat="latitude", lon="longitude",
+            custom_data=["job_ids", "count"],
+            height=450,
+        )
+        fig_map.update_traces(
             marker=dict(
-                size=grouped["count"].clip(upper=10) * 4 + 10,  # bigger where offers stack
+                size=10,
                 color=grouped["avg_score"],
                 colorscale="RdYlGn",
-                cmin=grouped["avg_score"].min(), cmax=grouped["avg_score"].max(),
-                showscale=True, colorbar=dict(title="Avg score"),
-                opacity=0.35,
+                cmin=grouped["avg_score"].min(),
+                cmax=grouped["avg_score"].max(),
+                showscale=True,
+                colorbar=dict(title="Avg score"),
+                opacity=grouped["marker_opacity"],
             ),
-            customdata=list(zip(grouped["job_ids"], grouped["count"])),
             text=grouped["hover_text"],
             hovertemplate="<b>%{customdata[1]} offer(s)</b><br>%{text}<extra></extra>",
-            name="density",
-        ))
-
-        # ── Overlay: sharp, opaque markers for the current selection — SAME color scale as base ──
-        if not highlighted_points.empty:
-            fig_map.add_trace(go.Scattermapbox(
-                lat=highlighted_points["latitude"], lon=highlighted_points["longitude"],
-                mode="markers",
-                marker=dict(
-                    size=10,
-                    color=highlighted_points["avg_score"],
-                    colorscale="RdYlGn",
-                    cmin=grouped["avg_score"].min(),   # mêmes bornes que la trace de base
-                    cmax=grouped["avg_score"].max(),   # pour que les couleurs correspondent visuellement
-                    showscale=False,                    # pas de 2e colorbar dupliquée
-                    opacity=1.0,
-                ),
-                hoverinfo="skip",
-                showlegend=False,
-                name="selected",
-            ))
-
+        )
         fig_map.update_layout(
             mapbox=dict(
-                style="carto-darkmatter", pitch=0, bearing=0,
+                style="carto-darkmatter",
+                pitch=0, bearing=0,
                 center=map_center, zoom=map_zoom,
             ),
             margin=dict(l=0, r=0, t=0, b=0),
@@ -792,7 +651,6 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             selectdirection="any",
             clickmode="event+select",
             uirevision="offers_map",
-            showlegend=False,
         )
 
         event = st.plotly_chart(
@@ -802,13 +660,12 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             config={"scrollZoom": True, "displayModeBar": True},
         )
 
+        # Map selection replaces the current selection (mirror with the table)
         if event.selection.points:
             clicked_ids = set()
             for pt in event.selection.points:
-                # Only trace 0 (density/base layer) carries the real job_ids to click on
-                if pt.get("curve_number", 0) == 0:
-                    clicked_ids.update(grouped.iloc[pt["point_index"]]["job_ids"])
-            if clicked_ids and clicked_ids != st.session_state["map_selected_job_ids"]:
+                clicked_ids.update(grouped.iloc[pt["point_index"]]["job_ids"])
+            if clicked_ids != st.session_state["map_selected_job_ids"]:
                 st.session_state["map_selected_job_ids"] = clicked_ids
                 st.rerun()
         else:
@@ -820,14 +677,15 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
     # ── Country pie + language bar ───────────────────────────────
     col1, col2 = st.columns(2)
     with col1:
-        country_counts = group_small_categories(d_analysis["country_full"].value_counts()).reset_index()
+        country_counts = group_small_categories(d["country_full"].value_counts()).reset_index()
         country_counts.columns = ["country", "count"]
         st.plotly_chart(
             px.pie(country_counts, names="country", values="count", title="Offers by country"),
             width="stretch",
         )
     with col2:
-        lang_counts = d_analysis["offer_languages_full"].dropna().explode().dropna()
+        # Bar chart, not pie: an offer can have several languages, so pie % wouldn't sum to 100%.
+        lang_counts = d["offer_languages_full"].dropna().explode().dropna()
         lang_counts = lang_counts[
             ~lang_counts.astype(str).str.strip().str.lower().isin(["none", "nan", ""])
         ]
@@ -842,7 +700,7 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
     # ── Seniority pie + top skills bar ───────────────────────────
     col3, col4 = st.columns(2)
     with col3:
-        seniority_counts = d_analysis["seniority"].value_counts().reset_index()
+        seniority_counts = d["seniority"].value_counts().reset_index()
         seniority_counts.columns = ["seniority", "count"]
         st.plotly_chart(
             px.pie(seniority_counts, names="seniority", values="count", title="Offers by seniority"),
@@ -858,8 +716,8 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
         }
         records = []
         for label, col in KEYWORD_CATEGORIES.items():
-            if col in d_analysis.columns:
-                exploded = d_analysis[col].dropna().explode().dropna()
+            if col in d.columns:
+                exploded = d[col].dropna().explode().dropna()
                 exploded = exploded[exploded.apply(lambda x: isinstance(x, str))]
                 exploded = exploded[exploded.str.strip() != ""]
                 for kw in exploded:
@@ -884,9 +742,11 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
 
     # ── Company poster table (checkbox-selectable, mirrors f["companies"]) ──
     st.markdown("**🏆 Job posters companies**")
-    d_base = d_company_base   # ← au lieu de d_filtered_without_company directement
-    d_with_site = d_base[d_base["website"].notna() & (d_base["website"] != "")]
 
+    # Built from data filtered by everything EXCEPT company, so checking one
+    # company doesn't make the others disappear from the list.
+    d_base = d_filtered_without_company
+    d_with_site = d_base[d_base["website"].notna() & (d_base["website"] != "")]
 
     company_count = d_with_site["company_name"].value_counts().reset_index()
     company_count.columns = ["company_name", "nb_offers"]
