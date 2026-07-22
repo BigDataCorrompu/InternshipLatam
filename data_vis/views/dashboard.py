@@ -189,7 +189,6 @@ def load_and_transform_dataframe(fingerprint: str) -> tuple[pd.DataFrame, dict]:
     and build the reverse index. Everything downstream reads from this cached result."""
     fingerprint = get_data_fingerprint()
     df = pd.DataFrame(load_real_offers(fingerprint))
-    df = pd.DataFrame(load_real_offers())
     df.set_index("job_id", inplace=True)
 
     # ── Basic cleaning ──
