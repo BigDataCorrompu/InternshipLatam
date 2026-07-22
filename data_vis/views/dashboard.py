@@ -770,13 +770,13 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
             # A selection is active: grey out + fade everything NOT selected.
             grouped["_rgb"] = grouped["avg_score"].apply(lambda s: _score_to_rgb(s, vmin, vmax))
             grouped["_final_color"] = grouped.apply(
-                lambda row: row["_rgb"] if row["is_highlighted"] else _blend_grey(row["_rgb"], weight=0.6),
+                lambda row: row["_rgb"] if row["is_highlighted"] else _blend_grey(row["_rgb"], weight=0.45),
                 axis=1,
             )
             base_color = grouped["_final_color"]
             base_colorscale = None
             base_showscale = False
-            base_opacity = grouped["is_highlighted"].map({True: 1.0, False: 0.5})
+            base_opacity = grouped["is_highlighted"].map({True: 1.0, False: 0.4})
 
         fig_map.add_trace(go.Scattermapbox(
             lat=grouped["latitude"], lon=grouped["longitude"],
