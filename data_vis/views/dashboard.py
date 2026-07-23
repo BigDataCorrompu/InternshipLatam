@@ -21,6 +21,7 @@ import os
 import sys
 import re
 import time
+import uuid
 import importlib.util
 from collections import defaultdict
 from pathlib import Path
@@ -34,6 +35,12 @@ from rapidfuzz import process, fuzz
 import country_converter as coco
 import pycountry
 from langchain_groq import ChatGroq
+sys.path.append(os.path.join(os.path.dirname(__file__), "../agent/"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../ingestion/python/src"))
+
+from dashboard_agent import DashboardAgent
+from LLMprovider import LLM
+from agent_tools import build_agent_tools
 
 # ════════════════════════════════════════════════════════════════════
 # Local module resolution (project is a monorepo, DB lives in ingestion/)
@@ -58,7 +65,7 @@ _db_module = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_db_module)
 Database = _db_module.Database
 
-from dashboard_agent import (
+from data_vis.agent.filters_agent import (
     extract_filters,
     criteria_to_filter_dict,
     summarize_criteria,
@@ -81,13 +88,14 @@ def get_db_connection() -> Database:
 
 
 @st.cache_resource
-def get_llm() -> ChatGroq:
-    """Groq LLM client (independent from the Silver enrichment / Ollama stack)."""
-    return ChatGroq(
-        model="llama-3.3-70b-versatile",
-        api_key=st.secrets["groq"]["api_key"],
-        temperature=0,
-    )
+def get_llm_provider() -> LLM:
+    return LLM(mistral_key=st.secrets["mistral"]["api_key"])
+
+@st.cache_resource
+def get_llm():
+    llm = get_llm_provider()
+    return llm.smart
+
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -234,7 +242,7 @@ def load_and_transform_dataframe(fingerprint: str) -> tuple[pd.DataFrame, dict]:
     return df, dict_reversed_index
 
 
-@st.cache_data
+@st.cache_data(hash_funcs={pd.DataFrame: lambda _: None})
 def build_city_country_map(df: pd.DataFrame) -> dict:
     """Map each city to its full country name.
     Prevents e.g. 'Santiago del Estero' (Argentina) from matching a 'Santiago' (Chile) filter."""
@@ -244,7 +252,7 @@ def build_city_country_map(df: pd.DataFrame) -> dict:
     return mapping
 
 
-@st.cache_data
+@st.cache_data(hash_funcs={pd.DataFrame: lambda _: None})
 def get_filter_options(df: pd.DataFrame, dict_reversed_index: dict) -> dict:
     """Precompute all option lists used by the sidebar widgets."""
     if not df["score_relevancy"].empty:
@@ -265,7 +273,7 @@ def get_filter_options(df: pd.DataFrame, dict_reversed_index: dict) -> dict:
             lang for sub in df["offer_languages_full"].dropna() for lang in sub
         )),
         "remote_labels": {None: "All", True: "Remote", False: "On-site"},
-        "day_options": [7, 14, 30, 60, 90, "All time"],
+        "day_options": [1, 3, 7, 14, 30, 60, 90, "All time"],
     }
 
 
@@ -361,10 +369,24 @@ def apply_filters(df: pd.DataFrame, f: dict, dict_reversed_index: dict, city_cou
         out = out[out["is_remote"] == f["remote"]]
 
     # ── Date range ("All time" = no filter) ──
-    if f["max_days"] != "All time" and "collected_at" in out.columns:
-        column_tz = out["collected_at"].dt.tz
-        cutoff = pd.Timestamp.now(tz=column_tz) - pd.Timedelta(days=f["max_days"])
-        out = out[out["collected_at"] >= cutoff]
+    # Uses published_at when valid, falls back to collected_at otherwise.
+    if f["max_days"] != "All time":
+        column_tz = out["collected_at"].dt.tz if "collected_at" in out.columns else None
+        today = pd.Timestamp.now(tz=column_tz)
+        min_valid_date = pd.Timestamp("2015-01-01", tz=column_tz)
+
+        if "published_at" in out.columns:
+            published = pd.to_datetime(out["published_at"], errors="coerce")
+            is_published_valid = published.notna() & (published >= min_valid_date) & (published <= today)
+        else:
+            published = pd.Series(pd.NaT, index=out.index)
+            is_published_valid = pd.Series(False, index=out.index)
+
+        collected = out["collected_at"] if "collected_at" in out.columns else pd.Series(pd.NaT, index=out.index)
+        effective_date = published.where(is_published_valid, collected)
+
+        cutoff = today - pd.Timedelta(days=f["max_days"])
+        out = out[effective_date >= cutoff]
 
     return out
 
@@ -450,6 +472,7 @@ with st.sidebar:
         key="w_remote",
         horizontal=True,
     )
+    st.caption('Older offers can be less precise due to workflow updates')
 
 # ════════════════════════════════════════════════════════════════════
 # Copy widgets -> dict (after rendering, captures manual input)
@@ -501,7 +524,7 @@ def _blend_grey(rgb_str, weight=0.25):
     return f"rgb({r*weight + 128*(1-weight):.0f},{g*weight + 128*(1-weight):.0f},{b*weight + 128*(1-weight):.0f})"
 
 
-@st.cache_data
+
 def build_map_groups(d: pd.DataFrame) -> pd.DataFrame | None:
     """Aggregate offers by (lat, lon) into one row per location, with hover text.
 
@@ -733,51 +756,59 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
 
     if grouped is None:
         st.info("No geolocated offers to display on the map.")
-    else:
-        grouped = grouped.copy()
+        grouped = pd.DataFrame(columns=["latitude", "longitude", "count", "job_ids",
+                                        "titles", "companies", "avg_score", "hover_text"])
 
-        if "map_selected_job_ids" not in st.session_state:
-            st.session_state["map_selected_job_ids"] = set()
-        selected_ids_set = st.session_state["map_selected_job_ids"]
+    grouped = grouped.copy()
+    selected_ids_set = st.session_state["map_selected_job_ids"]
 
+    if not grouped.empty:
         grouped["is_highlighted"] = grouped["job_ids"].apply(
             lambda ids: bool(selected_ids_set & set(ids))
         )
+    else:
+        grouped["is_highlighted"] = pd.Series(dtype=bool)
 
-        highlighted_points = grouped[grouped["is_highlighted"]]
-        if not highlighted_points.empty:
-            lats = highlighted_points["latitude"].tolist()
-            lons = highlighted_points["longitude"].tolist()
-            map_center = dict(lat=sum(lats) / len(lats), lon=sum(lons) / len(lons))
-            map_zoom = compute_zoom_for_bounds(lats, lons)
-        else:
-            map_center = dict(lat=-25, lon=-60)
-            map_zoom = 3
+    highlighted_points = grouped[grouped["is_highlighted"]]
 
-        
-        fig_map = go.Figure()
+    # ── Map center/zoom: remember the last known position instead of
+    # resetting to the default view whenever there's no active selection ──
+    if not highlighted_points.empty:
+        lats = highlighted_points["latitude"].tolist()
+        lons = highlighted_points["longitude"].tolist()
+        map_center = dict(lat=sum(lats) / len(lats), lon=sum(lons) / len(lons))
+        map_zoom = compute_zoom_for_bounds(lats, lons)
+        st.session_state["last_map_center"] = map_center
+        st.session_state["last_map_zoom"] = map_zoom
+    else:
+        map_center = st.session_state.get("last_map_center", dict(lat=-25, lon=-60))
+        map_zoom = st.session_state.get("last_map_zoom", 3)
 
-        # ── Base layer: density "glow" — large, semi-transparent circles ──
-        vmin, vmax = grouped["avg_score"].min(), grouped["avg_score"].max()
+    # ── Base layer: density "glow" — large, semi-transparent circles ──
+    vmin = grouped["avg_score"].min() if not grouped.empty else 0
+    vmax = grouped["avg_score"].max() if not grouped.empty else 10
 
-        if highlighted_points.empty:
-            # No selection: keep the normal color-scaled behavior, colorbar included.
-            base_color = grouped["avg_score"]
-            base_colorscale = "RdYlGn"
-            base_showscale = True
-            base_opacity = 0.35
-        else:
-            # A selection is active: grey out + fade everything NOT selected.
-            grouped["_rgb"] = grouped["avg_score"].apply(lambda s: _score_to_rgb(s, vmin, vmax))
-            grouped["_final_color"] = grouped.apply(
-                lambda row: row["_rgb"] if row["is_highlighted"] else _blend_grey(row["_rgb"], weight=0.5),
-                axis=1,
-            )
-            base_color = grouped["_final_color"]
-            base_colorscale = None
-            base_showscale = False
-            base_opacity = grouped["is_highlighted"].map({True: 1.0, False: 0.45})
+    fig_map = go.Figure()
 
+    if highlighted_points.empty:
+        # No selection: keep the normal color-scaled behavior, colorbar included.
+        base_color = grouped["avg_score"]
+        base_colorscale = "RdYlGn"
+        base_showscale = True
+        base_opacity = 0.35
+    else:
+        # A selection is active: grey out + fade everything NOT selected.
+        grouped["_rgb"] = grouped["avg_score"].apply(lambda s: _score_to_rgb(s, vmin, vmax))
+        grouped["_final_color"] = grouped.apply(
+            lambda row: row["_rgb"] if row["is_highlighted"] else _blend_grey(row["_rgb"], weight=0.5),
+            axis=1,
+        )
+        base_color = grouped["_final_color"]
+        base_colorscale = None
+        base_showscale = False
+        base_opacity = grouped["is_highlighted"].map({True: 1.0, False: 0.45})
+
+    if not grouped.empty:
         fig_map.add_trace(go.Scattermapbox(
             lat=grouped["latitude"], lon=grouped["longitude"],
             mode="markers",
@@ -805,47 +836,57 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
                     size=10,
                     color=highlighted_points["avg_score"],
                     colorscale="RdYlGn",
-                    cmin=grouped["avg_score"].min(),   # mêmes bornes que la trace de base
-                    cmax=grouped["avg_score"].max(),   # pour que les couleurs correspondent visuellement
-                    showscale=False,                    # pas de 2e colorbar dupliquée
+                    cmin=vmin, cmax=vmax,
+                    showscale=False,
                     opacity=1.0,
                 ),
                 hoverinfo="skip",
                 showlegend=False,
                 name="selected",
             ))
-
-        fig_map.update_layout(
-            mapbox=dict(
-                style="carto-darkmatter", pitch=0, bearing=0,
-                center=map_center, zoom=map_zoom,
-            ),
-            margin=dict(l=0, r=0, t=0, b=0),
-            dragmode="select",
-            selectdirection="any",
-            clickmode="event+select",
-            uirevision="offers_map",
+    else:
+        # Invisible anchor trace: forces Plotly to render a mapbox map
+        # (not a generic cartesian chart) even with zero offers.
+        fig_map.add_trace(go.Scattermapbox(
+            lat=[map_center["lat"]], lon=[map_center["lon"]],
+            mode="markers",
+            marker=dict(size=0, opacity=0),
+            hoverinfo="skip",
             showlegend=False,
-        )
+        ))
 
-        event = st.plotly_chart(
-            fig_map, width="stretch",
-            on_select="rerun", selection_mode="points",
-            key="offers_map",
-            config={"scrollZoom": True, "displayModeBar": True},
-        )
+    fig_map.update_layout(
+        mapbox=dict(
+            style="carto-darkmatter", pitch=0, bearing=0,
+            center=map_center, zoom=map_zoom,
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        dragmode="select",
+        selectdirection="any",
+        clickmode="event+select",
+        uirevision="offers_map",
+        showlegend=False,
+    )
 
-        if event.selection.points:
-            clicked_ids = set()
-            for pt in event.selection.points:
-                # Only trace 0 (density/base layer) carries the real job_ids to click on
-                if pt.get("curve_number", 0) == 0:
-                    clicked_ids.update(grouped.iloc[pt["point_index"]]["job_ids"])
-            if clicked_ids and clicked_ids != st.session_state["map_selected_job_ids"]:
-                st.session_state["map_selected_job_ids"] = clicked_ids
-                st.rerun()
-        else:
-            st.caption("💡 Drag a small box around one or more points to select them.")
+    event = st.plotly_chart(
+        fig_map, width="stretch",
+        on_select="rerun", selection_mode="points",
+        key="offers_map",
+        config={"scrollZoom": True, "displayModeBar": True},
+    )
+
+    if event.selection.points and not grouped.empty:
+        clicked_ids = set()
+        for pt in event.selection.points:
+            # Only trace 0 (density/base layer) carries the real job_ids to click on
+            if pt.get("curve_number", 0) == 0:
+                clicked_ids.update(grouped.iloc[pt["point_index"]]["job_ids"])
+        if clicked_ids and clicked_ids != st.session_state["map_selected_job_ids"]:
+            st.session_state["map_selected_job_ids"] = clicked_ids
+            st.rerun()
+    else:
+        st.caption("💡 Drag a small box around one or more points to select them.")
+
 
     # ── Offers table (mirrors the map selection) ─────────────────
     render_offers_table(d)
@@ -987,13 +1028,90 @@ st.caption(
 )
 
 
+
+
+# ════════════════════════════════════════════════════════════════════
+#  LLM Function
+# ════════════════════════════════════════════════════════════════════
+def summarize_dataframe_for_llm(d: pd.DataFrame) -> str:
+    """Build a lightweight text summary of the currently filtered offers,
+    meant to be returned to the LLM after it applies filters — gives it
+    just enough context to comment intelligently, without ever passing
+    the raw DataFrame."""
+    if d.empty:
+        return "No offers match the current filters."
+
+    nb_offers = len(d)
+    nb_companies = d["company_name"].nunique()
+    avg_score = d["score_relevancy"].mean()
+
+    top_countries = d["country_full"].value_counts().head(3)
+    countries_str = ", ".join(f"{c} ({n})" for c, n in top_countries.items())
+
+    top_cities = d["city"].value_counts().head(3)
+    cities_str = ", ".join(f"{c} ({n})" for c, n in top_cities.items())
+
+    seniority_counts = d["seniority"].value_counts()
+    seniority_str = ", ".join(f"{s} ({n})" for s, n in seniority_counts.items())
+
+    remote_count = int(d["is_remote"].sum())
+    onsite_count = nb_offers - remote_count
+
+    top_companies = d["company_name"].value_counts().head(5)
+    companies_str = ", ".join(f"{c} ({n})" for c, n in top_companies.items())
+
+    return (
+        f"{nb_offers} offers currently match, from {nb_companies} companies. "
+        f"Average relevancy score: {avg_score:.1f}/10. "
+        f"Top countries: {countries_str}. "
+        f"Top cities: {cities_str}. "
+        f"Seniority breakdown: {seniority_str}. "
+        f"Remote: {remote_count}, on-site: {onsite_count}. "
+        f"Top companies posting: {companies_str}."
+    )
+
+def get_current_filters():
+    return st.session_state["filters"]
+
+def on_filter_applied(filtered_df, new_filters):
+    st.session_state["filters"] = new_filters
+    st.session_state["_filters_dirty"] = True
+
+def get_df_schema_context(df) -> str:
+    """Short schema description injected into the agent's system prompt,
+    so it knows what fields exist without ever seeing the DataFrame itself."""
+    cols = ", ".join(df.columns.tolist())
+    return f"The offers dataset has these columns available: {cols}."
+
 # ════════════════════════════════════════════════════════════════════
 # 💬 Chatbot — floating bar pinned bottom-right
 # ════════════════════════════════════════════════════════════════════
+# Session for prompt caching
+if "session_id" not in st.session_state:
+    st.session_state["session_id"] = str(uuid.uuid4())
+
+# Tools for LLM
+tools = build_agent_tools(
+    df, dict_reversed_index, city_country_map,
+    get_current_filters, on_filter_applied,
+    apply_filters,               
+    summarize_dataframe_for_llm,
+    get_llm_provider(),
+    session_id=st.session_state["session_id"],
+)
+
+# LLM
+agent = DashboardAgent(
+    llm=get_llm(), tools=tools, max_iterations=4,
+    session_id=st.session_state["session_id"],
+)                  
+
 if "chat_history" not in st.session_state:
     st.session_state["chat_history"] = []
 if "chat_open" not in st.session_state:
     st.session_state["chat_open"] = False
+if "agent_history" not in st.session_state:
+    st.session_state["agent_history"] = []
 
 # ── Floating widget CSS (targets anchor divs to scope the styling) ──
 st.markdown("""
@@ -1040,6 +1158,7 @@ if st.session_state["chat_open"]:
             with st.chat_message(role):
                 st.markdown(content)
 
+
 # ── Toggle button (floating) ──
 with st.container():
     st.markdown('<div class="btn-anchor"></div>', unsafe_allow_html=True)
@@ -1054,29 +1173,39 @@ prompt = st.chat_input("Ask me anything...")
 # ── Force le retour en haut de page ──
 # st.chat_input pousse Streamlit à auto-scroller vers le bas après le rendu ;
 # on corrige pendant 1.5s juste après (le temps que ce comportement se déclenche).
+# ── Scroll le panneau de chat (pas la page) vers son propre bas ──
 st.html(f"""
 <script>
     (function() {{
         let tries = 0;
-        const forceTop = setInterval(() => {{
-            window.scrollTo(0, 0);
+        const scrollChatToBottom = setInterval(() => {{
+            const panels = document.querySelectorAll('div[data-testid="stVerticalBlock"]');
+            for (const panel of panels) {{
+                if (panel.querySelector('.chat-anchor')) {{
+                    panel.scrollTop = panel.scrollHeight;
+                }}
+            }}
             tries++;
-            if (tries > 15) clearInterval(forceTop);
+            if (tries > 15) clearInterval(scrollChatToBottom);
         }}, 100);
     }})();
 </script>
 <!-- run:{time.time()} -->
 """, unsafe_allow_javascript=True)
 
+
 if prompt and prompt.strip():
     st.session_state["chat_open"] = True
     st.session_state["chat_history"].append(("user", prompt))
 
     with st.spinner("Thinking..."):
-        criteria = extract_filters(prompt, get_llm())
-        new_filters = criteria_to_filter_dict(criteria, st.session_state["filters"])
-        st.session_state["filters"] = new_filters
-        st.session_state["_filters_dirty"] = True
+        response_text, updated_history = agent(prompt, st.session_state["agent_history"])
+        st.session_state["agent_history"] = updated_history
 
-    st.session_state["chat_history"].append(("assistant", summarize_criteria(criteria)))
+    st.session_state["chat_history"].append(("assistant", response_text))
     st.rerun()
+
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []
+
+

@@ -14,6 +14,7 @@ class LLM:
         self._enrichement = None
         self._smart = None
         self._fast = None
+        self._mailfinder = None
 
     @property
     def enrichement(self):
@@ -32,22 +33,36 @@ class LLM:
         """Light model usefull in graph redirection and dynamic scrapping query"""
         if self._fast is None:
             self._fast = ChatMistralAI(
-                model="ministral-3b-latest", 
+                model="ministral-8b-2512", 
                 mistral_api_key=self._mistral_key,
                 temperature=0
             )
         return self._fast
+    
 
     @property
     def smart(self):
-        """Intelligent model usefull for """
+        """Light model usefull in graph redirection and dynamic scrapping query"""
         if self._smart is None:
-            self._smart = ChatGoogleGenerativeAI(
+            self._smart = ChatMistralAI(
+                model="mistral-small-2603", 
+                mistral_api_key=self._mistral_key,
+                temperature=0
+            )
+        return self._smart
+
+
+
+    @property
+    def mailfinder(self):
+        """Intelligent model usefull for """
+        if self._mailfinder is None:
+            self._mailfinder = ChatGoogleGenerativeAI(
                 model="gemini-3.1-flash-lite",
                 google_api_key=self._gemini_key,
                 temperature=0
             )
-        return self._smart
+        return self._mailfinder
     
 
    
