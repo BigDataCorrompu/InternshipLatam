@@ -1089,6 +1089,9 @@ def get_df_schema_context(df) -> str:
     cols = ", ".join(df.columns.tolist())
     return f"The offers dataset has these columns available: {cols}."
 
+def get_selected_ids():
+    return st.session_state.get("map_selected_job_ids", set())
+
 # ════════════════════════════════════════════════════════════════════
 # 💬 Chatbot — floating bar pinned bottom-right
 # ════════════════════════════════════════════════════════════════════
@@ -1103,6 +1106,7 @@ tools = build_agent_tools(
     apply_filters,               
     summarize_dataframe_for_llm,
     get_llm_provider(),
+    get_selected_ids,
     session_id=st.session_state["session_id"],
 )
 

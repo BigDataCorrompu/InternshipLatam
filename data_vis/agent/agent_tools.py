@@ -43,7 +43,7 @@ class DataQueryArgs(BaseModel):
     company_name: str | None = Field(default=None, description="Used only for offer_detail or to filter top_offers/top_companies.")
 
 
-def build_agent_tools(df, dict_reversed_index, city_country_map, get_current_filters, on_filter_applied, apply_filters_fn, summarize_dataframe_fn, llm, session_id: str = "default"):
+def build_agent_tools(df, dict_reversed_index, city_country_map, get_current_filters, on_filter_applied, apply_filters_fn, summarize_dataframe_fn, llm, get_selected_ids=None, session_id: str = "default"):
     @st.cache_data(show_spinner=False, hash_funcs={pd.DataFrame: lambda _: None})
     def _cached_apply_filters(description: str, current_filters_key: str) -> tuple[str, dict]:
         current_filter = json.loads(current_filters_key)
@@ -88,13 +88,18 @@ def build_agent_tools(df, dict_reversed_index, city_country_map, get_current_fil
         return _cached_search_web(tuple(queries), what_to_find)
 
     @st.cache_data(show_spinner=False, hash_funcs={pd.DataFrame: lambda _: None})
-    def _cached_query_data(query_type, sort_by, ascending, limit, job_title, company_name, current_filters_key: str) -> str:
+    def _cached_query_data(query_type, sort_by, ascending, limit, job_title, company_name, current_filters_key: str, selected_ids_key: str) -> str:
         current_filter = json.loads(current_filters_key)
         current = apply_filters_fn(df, current_filter, dict_reversed_index, city_country_map)
+        # Lasso selection, if any, takes priority over the full filtered set.
+        selected_ids = set(json.loads(selected_ids_key)) if selected_ids_key != "[]" else set()
+        if selected_ids:
+            current = current[current.index.isin(selected_ids)]
+
         if company_name:
             current = current[current["company_name"].str.contains(company_name, case=False, na=False)]
         if current.empty:
-            return "No offers match the current filters."
+            return "No offers match the current filters." if not selected_ids else "No offers in the current lasso selection."
 
         if query_type == "offer_detail":
             subset = current
@@ -130,15 +135,18 @@ def build_agent_tools(df, dict_reversed_index, city_country_map, get_current_fil
     def query_data_tool(query_type: str, sort_by: str = "score", ascending: bool = False,
                           limit: int = 5, job_title: str | None = None, company_name: str | None = None) -> str:
         """Read specific data points from the offers currently shown on the dashboard:
-        top individual offers, top companies, or the full detail (keywords, explanation,
-        score) of one specific offer. Only use this when the user asks a SPECIFIC question
-        about the current results (e.g. "what are the top 5 offers", "which company posts
-        the most", "why does this offer have that score") — if the user is just filtering
-        or asking a general question, this tool is not needed.
+        top individual offers, top companies, top required skills/keywords, or the full
+        detail of one specific offer.
+        If the user has manually selected a subset of offers on the map (lasso/box select),
+        this tool operates ONLY on that selection. If nothing is selected, it falls back to
+        the full currently filtered offer pool automatically — you don't need to check which
+        case applies, just call this tool normally.
         Always operates on the CURRENT filter state — call apply_filters_tool first if the
         user is also asking to change the filters."""
+        selected_ids = get_selected_ids() if get_selected_ids else set()
         return _cached_query_data(query_type, sort_by, ascending, limit, job_title, company_name,
-                                    json.dumps(get_current_filters(), sort_keys=True, default=str))
+                                    json.dumps(get_current_filters(), sort_keys=True, default=str),
+                                    json.dumps(list(selected_ids)))
 
     return [apply_filters_tool, search_web_tool, query_data_tool]
 
