@@ -785,9 +785,8 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
         map_zoom = st.session_state.get("last_map_zoom", 3)
 
     # ── Base layer: density "glow" — large, semi-transparent circles ──
-    vmin = grouped["avg_score"].min() if not grouped.empty else 0
-    vmax = grouped["avg_score"].max() if not grouped.empty else 10
-
+    vmin, vmax = 0, 10
+    
     fig_map = go.Figure()
 
     if highlighted_points.empty:
