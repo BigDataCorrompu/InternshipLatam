@@ -958,14 +958,12 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
 
     # ── Company poster table (checkbox-selectable, mirrors f["companies"]) ──
     st.markdown("**🏆 Job posters companies**")
-    d_base = d_company_base   # ← au lieu de d_filtered_without_company directement
-    d_with_site = d_base[d_base["website"].notna() & (d_base["website"] != "")]
+    d_base = d_company_base
 
-
-    company_count = d_with_site["company_name"].value_counts().reset_index()
+    company_count = d_base["company_name"].value_counts().reset_index()
     company_count.columns = ["company_name", "nb_offers"]
     company_info = (
-        d_with_site.groupby("company_name")
+        d_base.groupby("company_name")
         .agg({
             "website": "first",
             "city": lambda x: ", ".join(sorted(set(x.dropna()))),
