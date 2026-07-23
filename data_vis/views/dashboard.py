@@ -1002,9 +1002,17 @@ def build_dashboard(d: pd.DataFrame, d_filtered_without_company: pd.DataFrame) -
         key="company_editor",
     )
 
-    newly_selected = edited.loc[edited["Select"], "Company"].tolist()
-    if set(newly_selected) != set(f["companies"]):
-        st.session_state["filters"]["companies"] = newly_selected
+    visible_companies = set(all_companies["Company"])
+    checked_in_table = set(edited.loc[edited["Select"], "Company"].tolist())
+    unchecked_in_table = visible_companies - checked_in_table  # décochées explicitement par l'utilisateur
+
+    # Nouvelle liste = ce qui était déjà sélectionné, moins ce qui vient d'être décoché,
+    # peu importe si d'autres entreprises sélectionnées ailleurs ne sont pas visibles ici.
+    current_selection = set(f["companies"])
+    new_selection = (current_selection - unchecked_in_table) | checked_in_table
+
+    if new_selection != current_selection:
+        st.session_state["filters"]["companies"] = list(new_selection)
         st.session_state["_filters_dirty"] = True
         st.rerun()
 
