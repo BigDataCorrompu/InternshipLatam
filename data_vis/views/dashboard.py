@@ -691,6 +691,14 @@ def render_offers_table(d: pd.DataFrame) -> None:
             else:
                 return "red", "🔴"
 
+        # Sort by grade
+        sorted_job_ids = sorted(
+            new_selected,
+            key=lambda jid: display_df.loc[display_df["job_id"] == jid, "score_relevancy"].iloc[0]
+                if not display_df[display_df["job_id"] == jid].empty else 0,
+            reverse=True,
+        )
+
         options_dict = {}
         for job_id in new_selected:
             match = display_df[display_df["job_id"] == job_id]
