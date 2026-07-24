@@ -27,13 +27,22 @@ def render_insights():
 st.markdown("""
 <style>
     .top-left-social {
-        position: absolute;
-        top: 60px;
-        right: 20px;
+        position: fixed;
+        top: 50px;
+        left: 15px;
         z-index: 999999;
         display: flex;
-        flex-direction: row;
+        flex-direction: column;
         gap: 8px;
+    }
+
+    /* Sur mobile : ancré à la page (scrolle avec le contenu), pas au viewport */
+    @media (max-width: 768px) {
+        .top-left-social {
+            position: absolute;
+            top: 60px;
+            left: 10px;
+        }
     }
 
     .social-badge {
@@ -50,7 +59,7 @@ st.markdown("""
     .social-badge:hover {
         background: #ff4b4b33;
         border-color: #ff4b4b;
-        transform: translateY(-2px);
+        transform: translateX(3px);
     }
     .social-badge svg { flex-shrink: 0; color: #ffffff; width: 18px; height: 18px; }
     .social-badge .label {
@@ -67,9 +76,13 @@ st.markdown("""
         font-size: 9px;
         color: #d0d0d0;
     }
+
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 140px !important;
+    }
 </style>
 <div class="top-left-social">
-    ...  <!-- tes deux <a> inchangés -->
+    ...  <!-- garde tes deux <a> inchangés -->
 </div>
 """, unsafe_allow_html=True)
 
