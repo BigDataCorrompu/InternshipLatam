@@ -713,7 +713,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
         
         selected_job_id_to_display = st.selectbox(
             "Select an offer to view details:",
-            options=list(options_dict.keys()),
+            options=sorted_job_ids,
             format_func=lambda x: options_dict[x],
             key="details_offer_selector"
         )
