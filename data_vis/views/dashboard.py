@@ -732,11 +732,14 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 expander_title = f"📌 :{color}[**[{score}/10]**] **{title}**    ({company} [{seniority}])"
                 
                 with st.expander(expander_title, expanded=True):
+                    languages = ", ".join(job.get('offer_languages_full') or [])
                     st.markdown(f"**Explanation:** {job.get('explanation', 'No explanation available.')}")
                     st.markdown(f"**Keywords:** `{job.get('keywords_str', 'None')}`")
-                    st.markdown(f"**Language:** {job.get('offer_languages_full', 'None')}")
-                    st.markdown(f"**Seniority:** {job.get('seniority', 'None')}")
-                    st.markdown(f"**Localisation:** {job.get('city', 'None')}, {job.get('city', 'None')}")
+                    st.markdown(
+                        f"**Seniority:** {job.get('seniority', 'None')}  \n"
+                        f"**Language:** {languages or 'None'}  \n"
+                        f"**Localisation:** {job.get('city', 'None')}, {job.get('country_full', 'None')}"
+                    )
 
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
