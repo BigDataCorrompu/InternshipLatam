@@ -730,9 +730,23 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 expander_title = f"📌 :{color}[**[{score}/10]**] **{title}** ({company})"
                 
                 with st.expander(expander_title, expanded=True):
+                    # ── Mini résumé : ville, séniorité, contrat, remote ──
+                    city = job.get("city", "N/A")
+                    country = job.get("country_full", "")
+                    seniority = job.get("seniority", "N/A")
+                    languages = job.get("languages", "")
+
+                    summary_col1, summary_col2, summary_col3 = st.columns(3)
+                    with summary_col1:
+                        st.markdown(f"📍 **{city}**{f', {country}' if country else ''}")
+                    with summary_col2:
+                        st.markdown(f"📈 **{seniority.capitalize() if isinstance(seniority, str) else seniority}**")
+                    with summary_col3:
+                        st.markdown(f"🗣️ **{languages if languages else 'N/A'}**")
+
+                    st.divider()
                     st.markdown(f"**Explanation:** {job.get('explanation', 'No explanation available.')}")
                     st.markdown(f"**Keywords:** `{job.get('keywords_str', 'None')}`")
-
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
 # ════════════════════════════════════════════════════════════════════
