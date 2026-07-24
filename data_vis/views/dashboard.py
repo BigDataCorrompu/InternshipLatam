@@ -101,7 +101,7 @@ def get_llm():
 # ════════════════════════════════════════════════════════════════════
 # Data loading (cached — one round-trip to Neon, refreshed on TTL)
 # ════════════════════════════════════════════════════════════════════
-@st.cache_data(show_spinner="Fetching real data from database...")
+@st.cache_data(ttl=600, show_spinner="Fetching real data from database...")
 def get_data_fingerprint() -> str:
     """Cheap query to detect if serving.job_offer has actually changed."""
     db = get_db_connection()
