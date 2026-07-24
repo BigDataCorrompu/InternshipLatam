@@ -29,7 +29,7 @@ st.markdown("""
     .top-left-social {
         position: fixed;
         top: 20px;
-        left: 40px;
+        left: 60px;
         z-index: 999999;
         display: flex;
         flex-direction: column;
