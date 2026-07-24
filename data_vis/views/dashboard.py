@@ -707,9 +707,10 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 title = selected_job.get("job_title", "Offer")
                 company = selected_job.get("company_name", "")
                 score = selected_job.get("score_relevancy", 0)
+                seniority = selected_job.get("seniority", "")
                 
                 _, emoji = get_score_visuals(score)
-                options_dict[job_id] = f"{emoji} [{score}/10] {title} ({company})"
+                options_dict[job_id] = f"{emoji} [{score}/10] {title}    ({company}) [{seniority}] "
         
         selected_job_id_to_display = st.selectbox(
             "Select an offer to view details:",
@@ -725,28 +726,18 @@ def render_offers_table(d: pd.DataFrame) -> None:
                 title = job.get("job_title", "Offer")
                 company = job.get("company_name", "")
                 score = job.get("score_relevancy", 0)
+                seniority = job.get("seniority", "")
                 
                 color, _ = get_score_visuals(score)
-                expander_title = f"📌 :{color}[**[{score}/10]**] **{title}** ({company})"
+                expander_title = f"📌 :{color}[**[{score}/10]**] **{title}**    ({company} [{seniority}])"
                 
                 with st.expander(expander_title, expanded=True):
-                    # ── Mini résumé : ville, séniorité, contrat, remote ──
-                    city = job.get("city", "N/A")
-                    country = job.get("country_full", "")
-                    seniority = job.get("seniority", "N/A")
-                    languages = job.get("languages", "")
-
-                    summary_col1, summary_col2, summary_col3 = st.columns(3)
-                    with summary_col1:
-                        st.markdown(f"📍 **{city}**{f', {country}' if country else ''}")
-                    with summary_col2:
-                        st.markdown(f"📈 **{seniority.capitalize() if isinstance(seniority, str) else seniority}**")
-                    with summary_col3:
-                        st.markdown(f"🗣️ **{languages if languages else 'N/A'}**")
-
-                    st.divider()
                     st.markdown(f"**Explanation:** {job.get('explanation', 'No explanation available.')}")
                     st.markdown(f"**Keywords:** `{job.get('keywords_str', 'None')}`")
+                    st.markdown(f"**Language:** {job.get('offer_languages_full', 'None')}")
+                    st.markdown(f"**Seniority:** {job.get('seniority', 'None')}")
+                    st.markdown(f"**Localisation:** {job.get('city', 'None')}, {job.get('city', 'None')}")
+
 # ════════════════════════════════════════════════════════════════════
 # Dashboard (metrics + map + charts + company table)
 # ════════════════════════════════════════════════════════════════════
