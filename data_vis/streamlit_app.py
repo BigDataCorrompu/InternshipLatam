@@ -28,7 +28,7 @@ st.markdown("""
 <style>
     .top-left-social {
         position: fixed;
-        top: 50px;
+        top: 20px;
         left: 15px;
         z-index: 999999;
         display: flex;
@@ -69,7 +69,7 @@ st.markdown("""
 
     /* Pousse le contenu de la sidebar vers le bas pour laisser la place aux badges */
     section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 140px !important;
+        padding-top: 50px !important;
     }
 </style>
 <div class="top-left-social">
