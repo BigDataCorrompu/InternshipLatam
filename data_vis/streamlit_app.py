@@ -24,55 +24,42 @@ def render_insights():
     st.title("💡 Insights")
     st.info("Cette section est en cours de développement et n'est pas encore implémentée.")
 
-st.markdown("""
-<style>
-    .top-left-social {
-        position: fixed;
-        top: 20px;
-        left: 60px;
-        z-index: 999999;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-    .social-badge {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: linear-gradient(135deg, #ff4b4b22, #ff4b4b11);
-        border: 1px solid #ff4b4b55;
-        border-radius: 10px;
-        padding: 6px 12px;
-        text-decoration: none;
-        transition: all 0.2s ease;
-    }
-    .social-badge:hover {
-        background: #ff4b4b33;
-        border-color: #ff4b4b;
-        transform: translateX(3px);
-    }
-    .social-badge svg { flex-shrink: 0; color: #ffffff; width: 18px; height: 18px; }
-    .social-badge .label {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.1;
-    }
-    .social-badge .label .main {
-        font-size: 12px;
-        font-weight: 600;
-        color: #ffffff;
-    }
-    .social-badge .label .sub {
-        font-size: 9px;
-        color: #d0d0d0;
-    }
-
-    /* Pousse le contenu de la sidebar vers le bas pour laisser la place aux badges */
-    section[data-testid="stSidebar"] > div:first-child {
-        padding-top: 50px !important;
-    }
-</style>
-<div class="top-left-social">
+with st.sidebar:
+    st.markdown("""
+    <style>
+        .social-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #ff4b4b22, #ff4b4b11);
+            border: 1px solid #ff4b4b55;
+            border-radius: 10px;
+            padding: 6px 12px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            margin-bottom: 8px;
+        }
+        .social-badge:hover {
+            background: #ff4b4b33;
+            border-color: #ff4b4b;
+            transform: translateX(3px);
+        }
+        .social-badge svg { flex-shrink: 0; color: #ffffff; width: 18px; height: 18px; }
+        .social-badge .label {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+        .social-badge .label .main {
+            font-size: 12px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        .social-badge .label .sub {
+            font-size: 9px;
+            color: #d0d0d0;
+        }
+    </style>
     <a href="https://www.linkedin.com/in/roland-oucherif/" target="_blank" class="social-badge">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
             <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
@@ -91,8 +78,8 @@ st.markdown("""
             <span class="sub">Project source code</span>
         </span>
     </a>
-</div>
-""", unsafe_allow_html=True)
+    <hr style="margin: 8px 0;">
+    """, unsafe_allow_html=True)
 
 # --- DÉFINITION DES PAGES ---
 dashboard_page = st.Page(page=str(dashboard_path), title="Dashboard", icon="📊", default=True)
