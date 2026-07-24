@@ -666,7 +666,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
             "country_full": st.column_config.TextColumn("Country", width="small"),
             "seniority": st.column_config.TextColumn("Level", width="small"),
             "languages": st.column_config.TextColumn("Languages", width="small"),
-            "date": st.column_config.TextColumn("Collected", width="small"),
+            "date": st.column_config.TextColumn("Published", width="small"),
             "score_relevancy": st.column_config.NumberColumn("Relevancy", width="small"),
         },
         key="offers_editor",
