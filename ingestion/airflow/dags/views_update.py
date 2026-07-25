@@ -4,7 +4,7 @@ from airflow.utils.trigger_rule import TriggerRule
 from airflow.exceptions import AirflowSkipException
 
 from database import Database
-from datasets import SILVER_OFFERS, GOLD_OFFERS
+from datasets import SILVER_OFFERS, GOLD_OFFERS, GOLD_HEALTH
 from datetime import datetime
 import logging
 logger = logging.getLogger(__name__)
@@ -13,6 +13,7 @@ SCHEDULE = "0 0 * * *"
 
 # SQL Requests
 GOLD_JOB_OFFER = 'SELECT serving.refresh_job_offer_if_stale();'
+GOLD_PIPELINE_HEALTH = 'SELECT * FROM serving.refresh_all_materialized();'
 
 @dag(
     dag_id='update_views',
@@ -39,7 +40,20 @@ def update_views():
         )
         db.execute(GOLD_JOB_OFFER)
 
-    gold_job_offer_task()
+    @task(task_id="gold_pipeline_health", outlets=[GOLD_HEALTH])
+    def gold_pipeline_health_task():
+        db = Database(
+            db_host           = Variable.get("DB_HOST"),
+            db_name           = Variable.get("DB_NAME"),
+            db_user           = Variable.get("DB_USER"),
+            db_password       = Variable.get("DB_PASSWORD"),
+            db_sslmode        = Variable.get("DB_SSLMODE",        default_var="require"),
+            db_channelbinding = Variable.get("DB_CHANNELBINDING", default_var="disable"),
+        )
+        # Exécute le rafraîchissement des vues matérialisées (si existantes)
+        db.execute(GOLD_PIPELINE_HEALTH)
+
+    gold_job_offer_task() >> gold_pipeline_health_task()
 
 
 update_views()

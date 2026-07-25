@@ -12,6 +12,7 @@ sys.path.insert(0, str(DOC_DIR))
 
 dashboard_path = CURRENT_DIR / "views" / "dashboard.py"
 doc_path = CURRENT_DIR / "views" / "doc.py"
+insights_path = CURRENT_DIR / "views" / "insights.py"
 
 # On remet l'état étendu (expanded) pour que la barre latérale s'affiche
 st.set_page_config(
@@ -83,7 +84,7 @@ with st.sidebar:
 
 # --- DÉFINITION DES PAGES ---
 dashboard_page = st.Page(page=str(dashboard_path), title="Dashboard", icon="📊", default=True)
-insights_page = st.Page(page=render_insights, title="Insights", icon="💡")
+insights_page = st.Page(page=str(insights_path), title="Insights", icon="💡")
 doc_page = st.Page(page=str(doc_path), title="Documentation (README)", icon="📝")
 
 pg = st.navigation([dashboard_page, insights_page, doc_page], position="hidden")

@@ -18,4 +18,6 @@ STAGING_ENRICHED = Dataset("neon://staging.enriched_offers")
 # Silver Neon — produit par staging_to_silver
 SILVER_OFFERS = Dataset("neon://analytics.job_offer")
 
+# Gold materialized views
 GOLD_OFFERS = Dataset("neon://serving.job_offer")
+GOLD_HEALTH = Dataset("neon://serving.pipeline_health")
