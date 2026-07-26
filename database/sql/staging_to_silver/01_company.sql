@@ -1,7 +1,7 @@
 INSERT INTO analytics.company (company_name, website, primary_type)
 SELECT DISTINCT ON (s.raw_result->>'company_name')
     s.raw_result->>'company_name',
-    s.raw_result->>'company_website',
+    LEFT(s.raw_result->>'company_website', 500),
     s.raw_result->>'company_primary_type'
 FROM staging.enriched_offers s
 LEFT JOIN analytics.job_offer o ON o.id_offer = s.id_offer
