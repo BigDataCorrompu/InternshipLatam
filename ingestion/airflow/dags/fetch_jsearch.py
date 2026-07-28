@@ -19,8 +19,8 @@ RAW_PATH = Path(os.getenv('RAW_DATA_PATH', '/opt/airflow/raw'))
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/opt/airflow/config"))
 
 # Parameter of frequency
-SCHEDULE_PERIOD = 3 # 3 days
-SCHEDULE = "0 20 */3 * *"
+SCHEDULE_PERIOD = 1 # 3 days
+SCHEDULE = "0 20 * * *"
 
 JOB_OFFER_TABLE = 'raw.job_offer'
 CONFIG = "jsearch_search_config"
