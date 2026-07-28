@@ -2,14 +2,12 @@
     "default_params": {
         "num_pages": 3,
         "date_posted": "3days",
-        "language": "en",
-        "job_requirements": "under_3_years_experience,no_experience",
-        "employment_types": "INTERN,FULLTIME"
+        "language": "en"
     },
     "queries": [
         {"query": "data engineer", "country": "cl"},
         {"query": "data engineer llm", "country": "cl"},
-        {"query": "llm integration", "country": "ar"},
+        {"query": "llm integration", "country": "cl"},
         
         {"query": "data engineer", "country": "ar"},
         {"query": "data engineer llm", "country": "ar"},

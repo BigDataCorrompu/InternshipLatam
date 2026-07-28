@@ -7,11 +7,11 @@
     "queries": [
         {"query": "junior data engineer", "country": "cl"},
         {"query": "data engineer llm", "country": "cl"},
-        {"query": "llm integration junior", "country": "cl"},
+        {"query": "llm integration junior Santiago", "country": "cl"},
         
         {"query": "junior data engineer", "country": "ar"},
         {"query": "data engineer llm", "country": "ar"},
-        {"query": "llm integration junior", "country": "ar"},
+        {"query": "llm integration junior Buenos Aires", "country": "ar"},
         
         {"keywords": "junior data engineer", "location": "Montevideo", "locale_code": "es_UY"},
         {"keywords": "data engineer llm", "location": "Montevideo", "locale_code": "es_UY"}
