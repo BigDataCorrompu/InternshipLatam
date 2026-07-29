@@ -88,7 +88,6 @@ verify_company = make_verify_included_node(
 
 find_location = FindLocation(geo_api=placesAPI)
 
-find_mails = FindMails(llm=llm)
 
 
 

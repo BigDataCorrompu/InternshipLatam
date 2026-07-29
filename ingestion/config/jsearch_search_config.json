@@ -2,14 +2,15 @@
     "default_params": {
         "num_pages": 3,
         "date_posted": "today",
+        "work_from_home": "false",
         "language": "en"
     },
     "queries": [
-        {"query": "data engineer", "country": "cl"},
-        {"query": "junior data engineer llm Santiago", "country": "cl"},
+        {"query": "data engineer", "location": "Santiago", "country": "cl"},
+        {"query": "junior data engineer llm Santiago", "location": "Santiago", "country": "cl"},
         
-        {"query": "data engineer", "country": "ar"},
-        {"query": "junior data engineer llm Buenos Aires", "country": "ar"},
+        {"query": "data engineer", "location": "Buenos Aires", "country": "ar"},
+        {"query": "junior data engineer llm Buenos Aires", "location": "Buenos Aires", "country": "ar"},
         
         {"query": "data engineer", "country": "uy"},
         {"query": "junior data engineer llm", "country": "uy"}

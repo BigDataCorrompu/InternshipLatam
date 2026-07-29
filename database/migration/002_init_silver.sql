@@ -65,7 +65,7 @@ CREATE TABLE analytics.company_contact (
 DROP TABLE IF EXISTS analytics.job_offer CASCADE;
 
 CREATE TABLE analytics.job_offer (
-    id_offer            VARCHAR(50)     PRIMARY KEY,   -- PK = déjà UNIQUE nativement
+    id_offer            TEXT            PRIMARY KEY,   -- PK = déjà UNIQUE nativement
     id_company          INT             REFERENCES analytics.company(id_company),
     id_location         INT             REFERENCES analytics.company_location(id_location),
     api_source          VARCHAR(15)     NOT NULL,
@@ -90,7 +90,7 @@ DROP TABLE IF EXISTS analytics.job_requirement CASCADE;
 
 CREATE TABLE analytics.job_requirement (
     id              SERIAL          PRIMARY KEY,
-    id_offer        VARCHAR(50)     NOT NULL REFERENCES analytics.job_offer(id_offer),
+    id_offer        TEXT            NOT NULL REFERENCES analytics.job_offer(id_offer),
     alternative_job_titles  TEXT[],
     offer_languages         TEXT[],
     seniority               VARCHAR(20),
@@ -112,7 +112,7 @@ DROP TABLE IF EXISTS analytics.job_relevancy CASCADE;
 
 CREATE TABLE analytics.job_relevancy (
     id              SERIAL          PRIMARY KEY,
-    id_offer        VARCHAR(50)     NOT NULL REFERENCES analytics.job_offer(id_offer),
+    id_offer        TEXT            NOT NULL REFERENCES analytics.job_offer(id_offer),
     id_prompt       INT             REFERENCES analytics.prompt_relevancy(id_prompt),
     score_relevancy FLOAT,
     score_job       FLOAT,
