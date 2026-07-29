@@ -110,6 +110,47 @@ class GeoAPI(API):
         raise NotImplementedError("Pas de pagination pour cette API")
 
 
+class MailAPI(API):
+    @abstractmethod
+    def search_mails(self):
+        pass
+
+# ──────────────────────────────────────────
+# Hunter.io
+# ──────────────────────────────────────────
+class HunterAPI(MailAPI):
+    BASE_URL = "https://api.hunter.io"
+    ENDPOINT = {
+        "email_finder": "email-finder",
+        "domain_search": "domain-search",
+    }
+    def __init__(self, api_key: str = None):
+        super().__init__(api_key or os.getenv('HUNTER_APP_KEY'))
+        self.header = {}
+
+    def _generate_params(self, params: dict = None, **kwargs):
+        params = super()._generate_params(params or {}, **kwargs)
+        params["api_key"] = self.api_key
+        return params
+
+    def search_domain(self, **kwargs) -> dict:
+        params = self._generate_params(**kwargs)
+        result = self._call("domain_search", params)
+        if not result:
+            raise ValueError(f"No result returned from Hunter.io for params={kwargs}")
+        return result
+
+    def _extract_results(self, raw: dict):
+        return raw.get("data", {}).get("emails", [])
+
+    def _has_next_page(self, raw: dict, page):
+        return False
+
+    def _next_page(self, raw: dict, page):
+        return None
+
+
+
 # ──────────────────────────────────────────
 # Google Maps
 # ──────────────────────────────────────────
