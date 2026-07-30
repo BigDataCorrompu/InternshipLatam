@@ -126,12 +126,15 @@ class HunterAPI(MailAPI):
     }
     def __init__(self, api_key: str = None):
         super().__init__(api_key or os.getenv('HUNTER_APP_KEY'))
-        self.header = {}
+        self.headers = {}
 
     def _generate_params(self, params: dict = None, **kwargs):
         params = super()._generate_params(params or {}, **kwargs)
         params["api_key"] = self.api_key
         return params
+
+    def search_mails(self, **kwargs) -> dict:
+        return self.search_domain(**kwargs)
 
     def search_domain(self, **kwargs) -> dict:
         params = self._generate_params(**kwargs)

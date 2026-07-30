@@ -1,32 +1,21 @@
-# STATE ET NOEUDS
-from typing import TypedDict, Annotated
-from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import AnyMessage, HumanMessage, ToolMessage
-import operator
-import json
-from rapidfuzz import fuzz, process
-from pydantic import BaseModel, field_validator, Field
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_groq import ChatGroq
-from dotenv import load_dotenv
-import operator
-from typing import Annotated
+# STATE AND NODES — email finding cascade (find_mails DAG)
 import os
-import sys
-sys.path.append("../ingestion/python/src")     
-from database import Database
-from LLMprovider import LLM
-from APIendpoint import GeoAPI  
-import reverse_geocoder
-from ddgs import DDGS
 import re
-import time
+import sys
+import operator
+from typing import Annotated, TypedDict
+
+from pydantic import BaseModel, Field
+from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.graph import StateGraph, START, END
+from ddgs import DDGS
+
+sys.path.append("../ingestion/python/src")
+from APIendpoint import HunterAPI, QuotaExceededError
 from silver_enrichment import Extract, call_with_retry
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 
-
-# ___ Scrapping queries __________________________________________
+# ___ Search queries schema __________________________________________
 class SearchQueryOutput(BaseModel):
     search_queries_mails: list[str] = Field(
         description=(
@@ -36,18 +25,25 @@ class SearchQueryOutput(BaseModel):
         )
     )
 
-# ___ Mails __________________________________________
+
+# ___ Email schema __________________________________________
 class EmailItem(BaseModel):
     email: str
     score: float
     reason: str
+    source: str = ""  # Filled in by each node after extraction, not by the LLM
+
 
 class EmailResults(BaseModel):
     emails: list[EmailItem] = Field(
-        description="List of relevant contact emails found. Return an empty list [] for the emails field if none are found, do not return an empty array as the entire response."
+        description=(
+            "List of relevant contact emails found. Return an empty list [] for the emails field "
+            "if none are found, do not return an empty array as the entire response."
+        )
     )
 
-# ___ Company data __________________________________________
+
+# ___ Company state __________________________________________
 class CompanyState(TypedDict):
     id_company: int
     company_name: str
@@ -58,16 +54,34 @@ class CompanyState(TypedDict):
     city: str
     country: str
 
-
     highest_grade: float
     average_grades: float
-    emails: EmailResults
+    contacts: Annotated[list[dict], operator.add]  # Accumulated email candidates (email/score/reason/source)
+
+
+# Shared system prompt for structured email extraction from raw text.
+_EXTRACTION_SYSTEM_PROMPT = SystemMessage(content="""
+    You are an assistant that extracts company contact emails.
+    I am looking to apply for a job/internship at this company.
+    From the search results provided, identify the most relevant emails.
+    1. Technical/data/IT team emails (score 0.8-1.0)
+    2. HR/recruitment emails (score 0.8-1.0)
+    3. CEO/executive (score 0.6-0.8)
+    4. Generic emails info@/contact@ (score 0.3-0.5)
+    ONLY use emails present in the provided search results.
+    NEVER generate an email from your general knowledge.
+    You MUST respond ONLY using the structured format provided.
+    Never write conversational text. Always use the function call format.
+    If no email is found, do not write any explanatory text.
+    """)
 
 
 class MailScrapping:
+    """Node 1: LLM generates search queries -> DDG search -> LLM extracts emails."""
+
     def __init__(self, llm):
         self._generate_query = Extract(
-            llm=llm.smart, 
+            llm=llm.smart,
             task=(
                 "Generate UP TO 3 short search queries to find contact emails at this company, "
                 "each targeting a DIFFERENT department:\n"
@@ -77,27 +91,28 @@ class MailScrapping:
                 "If you know the company website, use 'site:domain.com' plus ONE relevant keyword per query. "
                 "Otherwise, use the company name plus a department keyword. "
                 "Each query must be a SINGLE LINE, max 8 words, no line breaks. "
-                "Use the location to determine the language queries for exemple Spanish for Latin America "
+                "Use the location to determine the query language, for example Spanish for Latin America. "
                 "Return fewer than 3 queries only if a department is clearly irrelevant for this company."
             ),
             output_key="search_queries_mails",
             schema=SearchQueryOutput,
-            fields=["company_name", "website", "city", "country", "primary_type"]
+            fields=["company_name", "website", "city", "country", "primary_type"],
         )
         self._llm_structured = llm.mailfinder.with_structured_output(EmailResults)
-    
+
     def __call__(self, state: CompanyState) -> dict:
         company = state.get("company_name")
-        
-        if not company or company == 'null':
-            print(f"⚠️  find_mails: pas de company_name, recherche annulée — search_query_mail=None")
-            return {'contacts': [], 'search_queries_mail': None}
-        
+
+        if not company or company == "null":
+            print("⚠️  find_mails: no company_name, search aborted")
+            return {"contacts": []}
+
+        # 1. Ask the LLM to produce up to 3 targeted search queries.
         query_result = self._generate_query(state)
         search_queries_mails = query_result["search_queries_mails"]
-        print(f"🔍 find_mails: {company} — search_queries_mails='{query_result}'")
+        print(f"🔍 find_mails: {company} — queries={search_queries_mails}")
 
-        # Nettoyage + fallback si le LLM n'a produit aucune query exploitable
+        # 2. Clean queries; fall back to a basic query if the LLM produced nothing usable.
         cleaned_queries = []
         for q in (search_queries_mails or []):
             q = q.replace("\n", " ").strip()
@@ -107,59 +122,42 @@ class MailScrapping:
         if not cleaned_queries:
             country = state.get("country", "")
             cleaned_queries = [f"{company} RRHH contacto email {country}".strip()]
-            print(f"⚠️  find_mails: aucune query LLM valide pour {company}, fallback basique → '{cleaned_queries[0]}'")
+            print(f"⚠️  find_mails: no valid LLM query for {company}, basic fallback → '{cleaned_queries[0]}'")
 
-        # cleaned_queries = cleaned_queries[:3]  # garde-fou, même si le LLM a déjà pour consigne max 3
-
-        # Concaténation de tous les résultats DDG en un seul bloc (économique : 1 seul appel LLM d'extraction)
+        # 3. Run every query and concatenate results into a single block
+        #    (economical: one single LLM extraction call for all queries).
         combined_results = []
         for q in cleaned_queries:
             result = self._search_ddg(q)
             if result:
                 combined_results.append(f"[Query: {q}]\n{result}")
             else:
-                print(f"⚠️  find_mails: aucun résultat DDG pour {company} — query='{q}'")
+                print(f"⚠️  find_mails: no DDG result for {company} — query='{q}'")
 
         if not combined_results:
-            print(f"⚠️  find_mails: aucun résultat DDG sur toutes les queries pour {company}")
-            return {"contacts": [], "search_queries_mail": cleaned_queries}
+            print(f"⚠️  find_mails: no DDG result on any query for {company}")
+            return {"contacts": []}
 
         results_text = "\n\n".join(combined_results)
-        print(f"📄 find_mails: {len(results_text)} caractères reçus pour {company} — {len(cleaned_queries)} query(ies)")
+        print(f"📄 find_mails: {len(results_text)} chars received for {company} — {len(cleaned_queries)} query(ies)")
 
-                
-        system = SystemMessage(content="""
-            You are an assistant that extracts company contact emails.
-            I am looking to apply for a job/internship at this company.
-            From the search results provided, identify the most relevant emails.
-            1. Technical/data/IT team emails (score 0.8-1.0)
-            2. HR/recruitment emails (score 0.8-1.0)
-            3. CEO/executive (score 0.6-0.8)
-            4. Generic emails info@/contact@ (score 0.3-0.5)
-            ONLY use emails present in the provided search results.
-            NEVER generate an email from your general knowledge.
-            You MUST respond ONLY using the structured format provided.
-            Never write conversational text. Always use the function call format.
-            If no email is found, do not write any explanatory text.
-            """)
-
+        # 4. Extract structured emails from the concatenated text, tag the source.
         user = HumanMessage(content=f"Company: {company}\nResults:\n{results_text}")
-
-
         try:
-            response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
-            contacts = [item.model_dump() for item in response.emails]
+            response = call_with_retry(lambda: self._llm_structured.invoke([_EXTRACTION_SYSTEM_PROMPT, user]))
+            contacts = [{**item.model_dump(), "source": "ddg_llm"} for item in response.emails]
             if not contacts:
-                print(f"⚠️  find_mails: LLM n'a trouvé aucun email pour {company}")
+                print(f"⚠️  find_mails: LLM found no email for {company}")
             else:
-                print(f"✅ find_mails: {len(contacts)} contact(s) pour {company}")
-            return {"contacts": contacts, "search_queries_mail": cleaned_queries}
+                print(f"✅ find_mails: {len(contacts)} contact(s) for {company}")
+            return {"contacts": contacts}
         except Exception as e:
+            # The LLM sometimes returns "[]" in the wrong format instead of a valid empty result.
             if "'[]'" in str(e) or "failed_generation': '[]'" in str(e):
-                print(f"⚠️  find_mails: réponse vide interceptée pour {company}")
-                return {"contacts": [], "search_queries_mail": cleaned_queries}
-            print(f"❌ find_mails: erreur pour {company}: {e}")
-            return {"contacts": [], "search_queries_mail": cleaned_queries}
+                print(f"⚠️  find_mails: empty response intercepted for {company}")
+                return {"contacts": []}
+            print(f"❌ find_mails: error for {company}: {e}")
+            return {"contacts": []}
 
     def _search_ddg(self, query: str, max_results: int = 10) -> str:
         try:
@@ -169,24 +167,23 @@ class MailScrapping:
                     return ""
                 return "\n".join([r["body"] for r in results])
         except Exception as e:
-            print(f"Erreur DDG: {e}")
+            print(f"DDG error: {e}")
             return ""
-        
-
 
 
 class MailGrounder:
+    """Node 2: Gemini with native Google Search grounding -> LLM extracts emails."""
+
     def __init__(self, llm):
-        # Modèle avec grounding Google Search natif activé
-        self._grounded_llm = llm.grounder,
+        self._grounded_llm = llm.grounder  # Fixed: removed trailing comma (was a 1-tuple)
         self._llm_structured = llm.mailfinder.with_structured_output(EmailResults)
 
     def __call__(self, state: CompanyState) -> dict:
         company = state.get("company_name")
 
-        if not company or company == 'null':
-            print(f"⚠️  find_mails (grounder): pas de company_name, recherche annulée")
-            return {'contacts': [], 'grounding_used': False}
+        if not company or company == "null":
+            print("⚠️  find_mails (grounder): no company_name, search aborted")
+            return {"contacts": []}
 
         website = state.get("website", "")
         country = state.get("country", "")
@@ -201,46 +198,225 @@ class MailGrounder:
             "Report every email address you find, along with where you found it."
         )
 
+        # 1. Grounded search: Gemini searches the web and returns free text.
         try:
             response = call_with_retry(lambda: self._grounded_llm.invoke(prompt))
             grounded_text = response.content
-            print(f"🌐 find_mails (grounder): {len(grounded_text)} caractères groundés pour {company}")
+            print(f"🌐 find_mails (grounder): {len(grounded_text)} grounded chars for {company}")
         except Exception as e:
-            print(f"❌ find_mails (grounder): erreur grounding pour {company}: {e}")
-            return {"contacts": [], "grounding_used": False}
+            print(f"❌ find_mails (grounder): grounding error for {company}: {e}")
+            return {"contacts": []}
 
         if not grounded_text or not grounded_text.strip():
-            print(f"⚠️  find_mails (grounder): réponse groundée vide pour {company}")
-            return {"contacts": [], "grounding_used": True}
+            print(f"⚠️  find_mails (grounder): empty grounded response for {company}")
+            return {"contacts": []}
 
-        system = SystemMessage(content="""
-            You are an assistant that extracts company contact emails.
-            I am looking to apply for a job/internship at this company.
-            From the search results provided, identify the most relevant emails.
-            1. Technical/data/IT team emails (score 0.8-1.0)
-            2. HR/recruitment emails (score 0.8-1.0)
-            3. CEO/executive (score 0.6-0.8)
-            4. Generic emails info@/contact@ (score 0.3-0.5)
-            ONLY use emails present in the provided search results.
-            NEVER generate an email from your general knowledge.
-            You MUST respond ONLY using the structured format provided.
-            Never write conversational text. Always use the function call format.
-            If no email is found, do not write any explanatory text.
-            """)
-
+        # 2. Extract structured emails from the grounded text, tag the source.
         user = HumanMessage(content=f"Company: {company}\nResults:\n{grounded_text}")
-
         try:
-            structured_response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
-            contacts = [item.model_dump() for item in structured_response.emails]
+            structured_response = call_with_retry(
+                lambda: self._llm_structured.invoke([_EXTRACTION_SYSTEM_PROMPT, user])
+            )
+            contacts = [{**item.model_dump(), "source": "gemini_grounding"} for item in structured_response.emails]
             if not contacts:
-                print(f"⚠️  find_mails (grounder): aucun email extrait pour {company}")
+                print(f"⚠️  find_mails (grounder): no email extracted for {company}")
             else:
-                print(f"✅ find_mails (grounder): {len(contacts)} contact(s) pour {company}")
-            return {"contacts": contacts, "grounding_used": True}
+                print(f"✅ find_mails (grounder): {len(contacts)} contact(s) for {company}")
+            return {"contacts": contacts}
         except Exception as e:
             if "'[]'" in str(e) or "failed_generation': '[]'" in str(e):
-                print(f"⚠️  find_mails (grounder): réponse vide interceptée pour {company}")
-                return {"contacts": [], "grounding_used": True}
-            print(f"❌ find_mails (grounder): erreur extraction pour {company}: {e}")
-            return {"contacts": [], "grounding_used": True}
+                print(f"⚠️  find_mails (grounder): empty response intercepted for {company}")
+                return {"contacts": []}
+            print(f"❌ find_mails (grounder): extraction error for {company}: {e}")
+            return {"contacts": []}
+
+
+class MailFinderAPI:
+    """Node 3: one method per email-finder API provider. Takes CompanyState, returns {"contacts": [...]}."""
+
+    def __init__(self, hunter_api_key: str = None):
+        self._hunter = HunterAPI(hunter_api_key)
+        # Extensible registry: add "snov", "apollo"... as new methods here later.
+        self._providers = {
+            "hunter": self._hunter_domain_search,
+        }
+
+    def __call__(self, state: CompanyState, provider: str = "hunter") -> dict:
+        company = state.get("company_name")
+
+        if not company or company == "null":
+            print(f"⚠️  find_mails ({provider}): no company_name, search aborted")
+            return {"contacts": []}
+
+        if provider not in self._providers:
+            raise ValueError(f"Unknown provider: {provider}. Available: {list(self._providers)}")
+
+        return self._providers[provider](state)
+
+    def _hunter_domain_search(self, state: CompanyState) -> dict:
+        company = state.get("company_name")
+        website = state.get("website")
+        domain = self._extract_domain(website) if website else None
+
+        if not domain:
+            print(f"⚠️  find_mails (hunter): no domain for {company}, search aborted")
+            return {"contacts": []}
+
+        # QuotaExceededError is re-raised so the caller (graph) can fall back to the next provider.
+        try:
+            result = self._hunter.search_domain(domain=domain, company=company)
+        except QuotaExceededError:
+            print(f"⚠️  find_mails (hunter): quota exceeded for {company}")
+            raise
+        except ValueError as e:
+            print(f"⚠️  find_mails (hunter): {e}")
+            return {"contacts": []}
+
+        emails = result.get("data", {}).get("emails", [])
+        contacts = []
+        for e in emails:
+            email = e.get("value")
+            if not email:
+                continue
+
+            # Read raw fields once.
+            position = e.get("position", "") or ""
+            department = e.get("department", "") or ""
+            seniority = e.get("seniority", "") or ""
+            email_type = e.get("type", "")  # "personal" or "generic"
+            confidence = e.get("confidence")
+            verification_status = (e.get("verification") or {}).get("status")
+            linkedin = e.get("linkedin")
+            first_name = e.get("first_name", "") or ""
+            last_name = e.get("last_name", "") or ""
+
+            # Score from role keywords (lowercased position + department).
+            role_text = (position + department).lower()
+            if any(k in role_text for k in ["data", "it", "engineer", "tech", "developer", "devops", "software"]):
+                score = 0.9
+            elif any(k in role_text for k in ["hr", "recruit", "talent", "rrhh", "recursos humanos"]):
+                score = 0.9
+            elif any(k in role_text for k in ["ceo", "cto", "cfo", "founder", "director", "gerente", "president", "vp", "executive"]):
+                score = 0.7
+            else:
+                score = 0.4
+
+            # Full context string for the downstream email-writing LLM.
+            reason_parts = [f"Hunter match: {first_name} {last_name}".strip()]
+            if position:
+                reason_parts.append(f"Position: {position}")
+            if department:
+                reason_parts.append(f"Department: {department}")
+            if seniority:
+                reason_parts.append(f"Seniority: {seniority}")
+            if email_type:
+                reason_parts.append(f"Type: {email_type}")
+            if confidence is not None:
+                reason_parts.append(f"Confidence: {confidence}")
+            if verification_status:
+                reason_parts.append(f"Verification: {verification_status}")
+            if linkedin:
+                reason_parts.append(f"LinkedIn: {linkedin}")
+
+            contacts.append({
+                "email": email,
+                "score": score,
+                "reason": " | ".join(reason_parts),
+                "source": "hunter",
+            })
+
+        if not contacts:
+            print(f"⚠️  find_mails (hunter): no usable email for {company}")
+        else:
+            print(f"✅ find_mails (hunter): {len(contacts)} contact(s) for {company}")
+
+        return {"contacts": contacts}
+
+    @staticmethod
+    def _extract_domain(website: str) -> str | None:
+        if not website:
+            return None
+        domain = re.sub(r"^https?://", "", website)
+        domain = re.sub(r"^www\.", "", domain)
+        domain = domain.split("/")[0].strip()
+        return domain or None
+
+
+
+
+
+    
+# ___ Routing functions __________________________________________
+def has_relevant_email(state: CompanyState, min_score: float = 0.75) -> bool:
+    """A 'relevant' email is HR or IT/Data, per the scoring convention (score >= 0.7)."""
+    contacts = state.get("contacts") or []
+    return any(c.get("score", 0) >= min_score for c in contacts)
+
+
+def route_by_grade(state: CompanyState) -> str:
+    """
+    Low-relevance companies only get the free method (DDG) — no point
+    spending Gemini grounding quota or Hunter's limited quota on leads
+    unlikely to be worth pursuing.
+    """
+    grade = state.get("highest_grade", 0)
+    if grade >= 8:
+        return "grounder"
+    return "scrapping"
+
+
+def route_after_scrapping(state: CompanyState) -> str:
+    grade = state.get("highest_grade", 0)
+    if has_relevant_email(state):
+        return "end"
+    if grade >= 8:
+        return "hunter"  # High-relevance: worth spending Hunter quota as last resort
+    return "end"  # Low-relevance: DDG failed, stop here, don't spend quota
+
+
+def route_after_grounder(state: CompanyState) -> str:
+    if has_relevant_email(state):
+        return "end"
+    return "scrapping"  # Free fallback before spending Hunter quota
+
+
+
+# ___ Graph assembly __________________________________________
+def build_find_mails_graph(llm, hunter_api_key: str = None):
+    mail_scrapping = MailScrapping(llm)
+    mail_grounder = MailGrounder(llm)
+    mail_finder_api = MailFinderAPI(hunter_api_key)
+
+    graph = StateGraph(CompanyState)
+
+    graph.add_node("scrapping", mail_scrapping)
+    graph.add_node("grounder", mail_grounder)
+    graph.add_node("hunter", lambda state: mail_finder_api(state, provider="hunter"))
+
+    # Entry point: high-relevance companies start with grounding (best quality,
+    # costs grounding quota). Low-relevance companies start with free DDG scrapping.
+    graph.add_conditional_edges(
+        START,
+        route_by_grade,
+        {"scrapping": "scrapping", "grounder": "grounder"},
+    )
+
+    # After grounder: stop if found, otherwise fall back to free DDG scrapping.
+    graph.add_conditional_edges(
+        "grounder",
+        route_after_grounder,
+        {"end": END, "scrapping": "scrapping"},
+    )
+
+    # After scrapping: stop if found. If not, only high-relevance companies
+    # proceed to Hunter (limited quota) — low-relevance companies stop here.
+    graph.add_conditional_edges(
+        "scrapping",
+        route_after_scrapping,
+        {"end": END, "hunter": "hunter"},
+    )
+
+    # Hunter is always the last step in the cascade — no further fallback.
+    graph.add_edge("hunter", END)
+
+    return graph.compile()
