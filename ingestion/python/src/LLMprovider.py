@@ -15,6 +15,7 @@ class LLM:
         self._smart = None
         self._fast = None
         self._mailfinder = None
+        self._grounder = None
 
     @property
     def enrichement(self):
@@ -63,6 +64,14 @@ class LLM:
                 temperature=0
             )
         return self._mailfinder
-    
 
-   
+    @property
+    def grounder(self):
+        """Can web query via google"""
+        if self._grounder is None:
+            self._grounder = ChatGoogleGenerativeAI(
+                model="gemini-2.5-flash",
+                temperature=0,
+            ).bind_tools([{"google_search": {}}]) 
+        return self._grounder   
+
