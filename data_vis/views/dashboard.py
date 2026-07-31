@@ -273,7 +273,7 @@ def get_filter_options(df: pd.DataFrame, dict_reversed_index: dict) -> dict:
             lang for sub in df["offer_languages_full"].dropna() for lang in sub
         )),
         "remote_labels": {None: "All", True: "Remote", False: "On-site"},
-        "day_options": [1, 3, 7, 14, 30, 60, 90, "All time"],
+        "day_options": [2, 3, 7, 14, 30, 60, 90, "All time"],
     }
 
 
