@@ -148,14 +148,14 @@ def find_mails_dag():
         return [company["id_company"], company["id_location"], result.get("contacts", [])]
 
     @task(task_id="transfer", outlets=[FETCH_CONTACTS])
-    def push_to_db(results: list[dict]) -> None:
+    def push_to_db(results: list[list]) -> None:
         """
         Persists found emails as JSONB, one row per company.
         results: 2D array [n][3] — each row is [id_company, id_location, contacts].
         """
         db = Database()
         rows = [
-            (row[0], row[1], row[2])
+            (row[0], row[1], json.dumps(row[2]))
             for row in results
         ]
         
@@ -164,7 +164,9 @@ def find_mails_dag():
             return
 
         db.bulk_insert("staging.company_emails", ["id_company", "id_location", "raw_result"], rows)
-        print(f"✅ find_mails: {len(rows)} companies inserted out of {len(results)} companies")
+
+        found_count = sum(1 for row in results if row[2])
+        print(f"✅ find_mails: {len(rows)} attempt(s) recorded, {found_count} with email(s) found")
 
     companies = fetch_target_companies()
     results = run_email_search.expand(company=companies)
