@@ -120,7 +120,7 @@ class MailAPI(API):
 # ──────────────────────────────────────────
 class HunterAPI(MailAPI):
     BASE_URL = "https://api.hunter.io"
-    ENDPOINT = {
+    ENDPOINTS = {
         "email_finder": "email-finder",
         "domain_search": "domain-search",
     }
