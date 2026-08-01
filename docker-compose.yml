@@ -33,6 +33,7 @@ services:
         AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       volumes:
         - ./requirements-airflow.txt:/requirements.txt
+        - ./ingestion/airflow/variables/airflow_variables_find_mails.json:/opt/airflow/variables/airflow_variables_find_mails.json
       entrypoint: /bin/bash
       command: -c "
         pip install -r /requirements.txt &&
@@ -43,8 +44,9 @@ services:
           --firstname Admin \
           --lastname User \
           --role Admin \
-          --email ${AIRFLOW_ADMIN_EMAIL}"
-      build: . 
+          --email ${AIRFLOW_ADMIN_EMAIL} &&
+        airflow variables import /opt/airflow/variables/airflow_variables_find_mails.json"
+      build: .
 
   airflow-scheduler:
     image: apache/airflow:2.9.1

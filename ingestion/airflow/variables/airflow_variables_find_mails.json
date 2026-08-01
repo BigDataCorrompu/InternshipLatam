@@ -1,0 +1,7 @@
+{
+  "find_mails_target_countries": "[\"CL\", \"AR\", \"UY\"]",
+  "find_mails_target_cities": "[]",
+  "find_mails_min_grade": "5",
+  "find_mails_high_relevance_grade": "8",
+  "find_mails_batch_limit": "10"
+}
