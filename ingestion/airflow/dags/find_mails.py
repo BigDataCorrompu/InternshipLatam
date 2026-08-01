@@ -73,10 +73,10 @@ def find_mails_dag():
                 MAX(COALESCE(job_offer.posted_at, job_offer.collected_at)) AS last_offer_date,
                 c.id_company, c.company_name, c.website, c.primary_type,
                 cl.id_location, cl.city, cl.country
-            FROM job_relevancy AS jr 
-                INNER JOIN job_offer AS job_offer ON jr.id_offer = job_offer.id_offer
-                INNER JOIN company AS c ON job_offer.id_company = c.id_company 
-                INNER JOIN company_location AS cl ON c.id_company = cl.id_company
+            FROM analytics.job_relevancy AS jr 
+                INNER JOIN analytics.job_offer AS job_offer ON jr.id_offer = job_offer.id_offer
+                INNER JOIN analytics.company AS c ON job_offer.id_company = c.id_company 
+                INNER JOIN analytics.company_location AS cl ON c.id_company = cl.id_company
             WHERE cl.country = ANY(%(countries)s)
             AND (cardinality(%(cities)s) = 0 OR cl.city = ANY(%(cities)s))
             AND c.id_company NOT IN (
