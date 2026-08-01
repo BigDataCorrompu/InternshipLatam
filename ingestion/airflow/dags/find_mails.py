@@ -77,8 +77,8 @@ def find_mails_dag():
                 INNER JOIN analytics.job_offer AS job_offer ON jr.id_offer = job_offer.id_offer
                 INNER JOIN analytics.company AS c ON job_offer.id_company = c.id_company 
                 INNER JOIN analytics.company_location AS cl ON c.id_company = cl.id_company
-            WHERE cl.country = ANY(%(countries)s)
-            AND (cardinality(%(cities)s) = 0 OR cl.city = ANY(%(cities)s))
+            WHERE cl.country = ANY(%(countries)s::text[])
+            AND (cardinality(%(cities)s::text[]) = 0 OR cl.city = ANY(%(cities)s::text[]))
             AND c.id_company NOT IN (
                 SELECT se.id_company
                 FROM staging.company_emails se,
