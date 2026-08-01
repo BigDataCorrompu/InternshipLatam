@@ -90,7 +90,7 @@ def find_mails_dag():
             GROUP BY c.id_company, c.company_name, c.website, c.primary_type,
                     cl.id_location, cl.city, cl.country
             HAVING MAX(jr.score_relevancy) >= %(min_grade)s
-            ORDER BY last_offer_date DESC, max_score DESC
+            ORDER BY last_offer_date DESC, highest_grade DESC
             LIMIT %(limit)s
         """
         
