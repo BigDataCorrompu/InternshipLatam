@@ -112,8 +112,8 @@ def find_mails_dag():
               f"min_grade={config['min_grade']})")
         return companies
 
-    @task(task_id="Search")
-    def run_email_search(company: dict) -> dict:
+    @task(task_id="Search", multiple_outputs=False)
+    def run_email_search(company: dict) -> list:
         """
         Runs the LangGraph cascade (grounder → scrapping → hunter) for a single
         company. Dynamically mapped by Airflow over fetch_target_companies().
@@ -145,11 +145,7 @@ def find_mails_dag():
             print(f"⚠️  find_mails: quota exceeded on {company['company_name']}, contacts kept as-is: {e}")
             result = initial_state  # Whatever was accumulated before the quota hit
 
-        return [
-            company["id_company"], 
-            company["id_location"], 
-            result.get("contacts", [])
-        ]
+        return [company["id_company"], company["id_location"], result.get("contacts", [])]
 
     @task(task_id="transfer", outlets=[FETCH_CONTACTS])
     def push_to_db(results: list[dict]) -> None:
