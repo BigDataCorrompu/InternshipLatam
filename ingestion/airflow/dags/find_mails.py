@@ -70,7 +70,7 @@ def find_mails_dag():
             SELECT 
                 AVG(jr.score_relevancy) AS avg_score, 
                 MAX(jr.score_relevancy) AS max_score,
-                MAX(COALESCE(job_offer.posted_at, job_offer.collected_at)) AS last_offer_date,
+                MAX(COALESCE(job_offer.published_at, job_offer.collected_at)) AS last_offer_date,
                 c.id_company, c.company_name, c.website, c.primary_type,
                 cl.id_location, cl.city, cl.country
             FROM analytics.job_relevancy AS jr 
