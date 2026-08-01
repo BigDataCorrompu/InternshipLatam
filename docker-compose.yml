@@ -84,10 +84,12 @@ services:
       AIRFLOW_VAR_CAREERJET_USER_AGENT: ${CAREERJET_USER_AGENT}
       AIRFLOW_VAR_CAREERJET_REFERER: ${CAREERJET_REFERER}
       AIRFLOW_VAR_SERVER_IP: ${SERVER_IP}
+      AIRFLOW_VAR_MAPS_APP_KEY: ${MAPS_APP_KEY}
+      AIRFLOW_VAR_HUNTER_APP_KEY: ${HUNTER_APP_KEY}
       # LLM __________________________________________________
       AIRFLOW_VAR_MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       AIRFLOW_VAR_GEMINI_API_KEY: ${GEMINI_API_KEY}
-      AIRFLOW_VAR_MAPS_APP_KEY: ${MAPS_APP_KEY}
+      
     volumes:
       - ./ingestion/airflow/dags:/opt/airflow/dags
       - ./ingestion/python/src:/opt/airflow/pipeline
