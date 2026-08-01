@@ -4,6 +4,7 @@
 from airflow.decorators import dag, task
 from datetime import datetime
 from airflow.models import Variable
+from pathlib import Path
 from database import Database
 from datasets import FETCH_CONTACTS, SILVER_CONTACTS 
 import logging
