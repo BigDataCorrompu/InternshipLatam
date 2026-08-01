@@ -10,7 +10,7 @@ from datasets import FETCH_CONTACTS, SILVER_CONTACTS
 import logging
 logger = logging.getLogger(__name__)
 
-SQL_DIR = "/opt/airflow/pipeline/sql/staging_to_silver/"
+SQL_DIR = "/opt/airflow/pipeline/sql/staging_to_silver_contact/"
 
 
 @dag(
