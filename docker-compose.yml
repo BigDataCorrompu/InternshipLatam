@@ -32,7 +32,7 @@ services:
         AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
         AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       volumes:
-        - ./requirements.txt:/requirements.txt
+        - ./requirements-airflow.txt:/requirements.txt
       entrypoint: /bin/bash
       command: -c "
         pip install -r /requirements.txt &&
