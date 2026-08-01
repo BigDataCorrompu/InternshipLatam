@@ -91,6 +91,7 @@ services:
       - ./ingestion/python/src:/opt/airflow/pipeline
       - ./ingestion/python/enrichment_agent:/opt/airflow/agent
       - ./database/sql/staging_to_silver:/opt/airflow/pipeline/sql/staging_to_silver/
+      - ./database/sql/staging_to_silver_contact:/opt/airflow/pipeline/sql/staging_to_silver_contact/
       - ./ingestion/logs:/opt/airflow/logs
       - ./ingestion/raw:/opt/airflow/raw
       - ./ingestion/config:/opt/airflow/config

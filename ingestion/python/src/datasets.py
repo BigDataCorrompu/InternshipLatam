@@ -19,6 +19,7 @@ STAGING_ENRICHED = Dataset("neon://staging.enriched_offers")
 SILVER_OFFERS = Dataset("neon://analytics.job_offer")
 
 # Silver Neon - company contact
+FETCH_CONTACTS = Dataset("neon://staging.company_emails")
 SILVER_CONTACTS = Dataset("neon://analytics.company_contact")
 
 # Gold materialized views

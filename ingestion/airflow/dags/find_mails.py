@@ -9,7 +9,7 @@ import json
 
 from database import Database
 from LLMprovider import LLM
-from datasets import SILVER_OFFERS, SILVER_CONTACTS
+from datasets import SILVER_OFFERS, FETCH_CONTACTS
 from find_mails_graph import build_find_mails_graph, CompanyState
 
 
@@ -40,7 +40,7 @@ def get_config() -> dict:
 
 
 @dag(
-    dag_id='load_to_bronze',
+    dag_id='find_mails',
     start_date=datetime(2026, 6, 7),
     schedule=[SILVER_OFFERS],
     catchup=False,
@@ -67,16 +67,28 @@ def find_mails_dag():
         )
 
         query = """
-            SELECT id_company, company_name, website, primary_type,
-                   id_location, city, country, highest_grade, average_grades
-            FROM serving.company_scores
-                WHERE country = ANY(%(countries)s)
-                AND (cardinality(%(cities)s) = 0 OR city = ANY(%(cities)s))
-                AND highest_grade >= %(min_grade)s
-                AND id_company NOT IN (SELECT id_company FROM staging.company_emails)
-                ORDER BY highest_grade DESC
-                LIMIT %(limit)s
+            SELECT AVG(jr.score_relevancy) AS avg_score, MAX(jr.score_relevancy) AS max_score,
+            c.id_company, c.company_name, c.website, c.primary_type
+            cl.id_location, cl.city, cl.country
+            FROM job_relevancy as jr 
+                INNER JOIN job_offer as job_offer ON jr.id_offer = job_offer.id_offer
+                INNER JOIN company as c ON job_offer.id_company = c.id_company 
+                INNER JOIN company_location as cl ON c.id_company = cl.id_company
+            WHERE cl.country = ANY(%(countries)s)
+            AND (cardinality(%(cities)s) = 0 OR city = ANY(%(cities)s))
+            AND max_score >= %(min_grade)s
+            AND c.id_company NOT IN (
+                SELECT se.id_company
+                FROM staging.company_emails se,
+                    LATERAL jsonb_array_elements(se.raw_result) AS contact
+                GROUP BY se.id_company
+                HAVING COUNT(DISTINCT se.collected_at) >= 3
+                    OR MAX((contact->>'score')::NUMERIC(3,2)) >= 0.8
+            )
+            ORDER BY max_score DESC
+            LIMIT %(limit)s
         """
+        
         params = {
             "countries": config["target_countries"],
             "cities": config["target_cities"],
@@ -127,42 +139,31 @@ def find_mails_dag():
             print(f"⚠️  find_mails: quota exceeded on {company['company_name']}, contacts kept as-is: {e}")
             result = initial_state  # Whatever was accumulated before the quota hit
 
-        return {
-            "id_company": company["id_company"],
-            "contacts": result.get("contacts", []),
-        }
+        return [
+            company["id_company"], 
+            company["id_location"], 
+            result.get("contacts", [])
+        ]
 
-    @task(task_id="trnasfer", outlets=[SILVER_CONTACTS])
+    @task(task_id="transfer", outlets=[FETCH_CONTACTS])
     def push_to_db(results: list[dict]) -> None:
         """
-        Persists all found emails. One row per email (not just the best),
-        to keep full traceability across providers.
+        Persists found emails as JSONB, one row per company.
+        results: 2D array [n][3] — each row is [id_company, id_location, contacts].
         """
         db = Database()
-        rows = []
-        for r in results:
-            for contact in r["contacts"]:
-                rows.append((
-                    r["id_company"],
-                    contact["email"],
-                    contact["score"],
-                    contact["reason"],
-                    contact["source"],
-                ))
-
-        if not rows:
+        rows = [
+            (row[0], row[1], row[2])
+            for row in result
+            if row[2]
+        ]
+        
+        if not row:
             print("⚠️  find_mails: no emails found across the whole batch, nothing to insert")
             return
 
-        db.execute_many(
-            """
-            INSERT INTO staging.company_emails (id_company, email, score, reason, source, found_at)
-            VALUES (%s, %s, %s, %s, %s, NOW())
-            ON CONFLICT (id_company, email) DO NOTHING
-            """,
-            rows,
-        )
-        print(f"✅ find_mails: {len(rows)} email(s) inserted across {len(results)} compan(y/ies)")
+        db.bulk_insert("staging.company_emails", ["id_company", "id_location", "raw_result"], rows)
+        print(f"✅ find_mails: {len(rows)} companies inserted out of {len(results)} companies")
 
     companies = fetch_target_companies()
     results = run_email_search.expand(company=companies)
