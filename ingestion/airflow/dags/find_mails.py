@@ -156,7 +156,7 @@ def find_mails_dag():
         db = Database()
         rows = [
             (row[0], row[1], row[2])
-            for row in result
+            for row in results
         ]
         
         if not row:
