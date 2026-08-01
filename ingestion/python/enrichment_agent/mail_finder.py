@@ -353,26 +353,21 @@ def has_relevant_email(state: CompanyState, min_score: float = 0.75) -> bool:
     return any(c.get("score", 0) >= min_score for c in contacts)
 
 
-def route_by_grade(state: CompanyState) -> str:
-    """
-    Low-relevance companies only get the free method (DDG) — no point
-    spending Gemini grounding quota or Hunter's limited quota on leads
-    unlikely to be worth pursuing.
-    """
+
+def route_by_grade(state: CompanyState, threshold: int = 8) -> str:
     grade = state.get("highest_grade", 0)
-    if grade >= 8:
+    if grade >= threshold:
         return "grounder"
     return "scrapping"
 
 
-def route_after_scrapping(state: CompanyState) -> str:
+def route_after_scrapping(state: CompanyState, threshold: int = 8) -> str:
     grade = state.get("highest_grade", 0)
     if has_relevant_email(state):
         return "end"
-    if grade >= 8:
-        return "hunter"  # High-relevance: worth spending Hunter quota as last resort
-    return "end"  # Low-relevance: DDG failed, stop here, don't spend quota
-
+    if grade >= threshold:
+        return "hunter"
+    return "end"
 
 def route_after_grounder(state: CompanyState) -> str:
     if has_relevant_email(state):
@@ -382,7 +377,9 @@ def route_after_grounder(state: CompanyState) -> str:
 
 
 # ___ Graph assembly __________________________________________
-def build_find_mails_graph(llm, hunter_api_key: str = None):
+
+
+def build_find_mails_graph(llm, hunter_api_key: str = None, high_relevance_grade: int = 8):
     mail_scrapping = MailScrapping(llm)
     mail_grounder = MailGrounder(llm)
     mail_finder_api = MailFinderAPI(hunter_api_key)
@@ -393,30 +390,25 @@ def build_find_mails_graph(llm, hunter_api_key: str = None):
     graph.add_node("grounder", mail_grounder)
     graph.add_node("hunter", lambda state: mail_finder_api(state, provider="hunter"))
 
-    # Entry point: high-relevance companies start with grounding (best quality,
-    # costs grounding quota). Low-relevance companies start with free DDG scrapping.
+    # functools.partial binds the threshold, since add_conditional_edges only
+    # passes the state to the routing function — it can't pass extra args itself.
+    from functools import partial
+
     graph.add_conditional_edges(
         START,
-        route_by_grade,
+        partial(route_by_grade, threshold=high_relevance_grade),
         {"scrapping": "scrapping", "grounder": "grounder"},
     )
-
-    # After grounder: stop if found, otherwise fall back to free DDG scrapping.
     graph.add_conditional_edges(
         "grounder",
         route_after_grounder,
         {"end": END, "scrapping": "scrapping"},
     )
-
-    # After scrapping: stop if found. If not, only high-relevance companies
-    # proceed to Hunter (limited quota) — low-relevance companies stop here.
     graph.add_conditional_edges(
         "scrapping",
-        route_after_scrapping,
+        partial(route_after_scrapping, threshold=high_relevance_grade),
         {"end": END, "hunter": "hunter"},
     )
-
-    # Hunter is always the last step in the cascade — no further fallback.
     graph.add_edge("hunter", END)
 
     return graph.compile()
