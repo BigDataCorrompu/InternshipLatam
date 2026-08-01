@@ -64,17 +64,19 @@ _EXTRACTION_SYSTEM_PROMPT = SystemMessage(content="""
     You are an assistant that extracts company contact emails.
     I am looking to apply for a job/internship at this company.
     From the search results provided, identify the most relevant emails.
-    1. Technical/data/IT team emails (score 0.8-1.0)
+    1. Technical/data/IT team emails involved in HIRING or team contact (score 0.8-1.0)
     2. HR/recruitment emails (score 0.8-1.0)
     3. CEO/executive (score 0.6-0.8)
     4. Generic emails info@/contact@ (score 0.3-0.5)
+    EXCLUDE emails for internal support, helpdesk, access management, IT ticketing,
+    customer service, or any address whose purpose is NOT hiring/recruitment/team contact —
+    even if it contains words like "IT" or "technical" in its name.
     ONLY use emails present in the provided search results.
     NEVER generate an email from your general knowledge.
     You MUST respond ONLY using the structured format provided.
     Never write conversational text. Always use the function call format.
     If no email is found, do not write any explanatory text.
     """)
-
 
 class MailScrapping:
     """Node 1: LLM generates search queries -> DDG search -> LLM extracts emails."""
@@ -85,7 +87,8 @@ class MailScrapping:
             task=(
                 "Generate UP TO 3 short search queries to find contact emails at this company, "
                 "each targeting a DIFFERENT department:\n"
-                "1. IT / Data Engineering team contact (e.g. 'equipo data', 'IT department', 'data engineer team')\n"
+                "1. IT / Data Engineering team contact (e.g. 'equipo data', 'IT department', 'data engineer team') "
+                "-- NOT internal support/helpdesk/access management\n"
                 "2. HR / recruitment contact (e.g. 'RRHH', 'recursos humanos', 'talent acquisition')\n"
                 "3. General manager / direction contact (e.g. 'gerente general', 'direccion')\n"
                 "If you know the company website, use 'site:domain.com' plus ONE relevant keyword per query. "
@@ -212,9 +215,11 @@ class MailGrounder:
             f"Find contact emails for {company}"
             f"{f' (website: {website})' if website else ''}, located in {city}, {country}. "
             "I am looking to apply for a job/internship. "
-            "Search for HR/recruitment contacts, IT/Data Engineering team contacts, "
+            "Search for HR/recruitment contacts, IT/Data Engineering team contacts involved in hiring, "
             "general manager/direction contacts, or generic contact emails. "
-            "Report every email address you find, along with where you found it."
+            "EXCLUDE internal support, helpdesk, IT ticketing, access management, or customer service "
+            "addresses — these are NOT useful for a job application, even if they mention 'IT' or 'technical'. "
+            "Report every relevant email address you find, along with where you found it."
         )
 
         # 1. Grounded search: Gemini searches the web and returns free text.
