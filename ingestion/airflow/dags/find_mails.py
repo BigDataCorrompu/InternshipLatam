@@ -20,7 +20,7 @@ DEFAULT_CONFIG = {
     "target_cities": [],
     "min_grade": 5,           # Minimum highest_grade for a company to be processed at all
     "high_relevance_grade": 8,  # Threshold used inside the graph's routing (grounder/hunter access)
-    "batch_limit": 10,        # Max companies processed per run, to respect provider quotas
+    "batch_limit": 15,        # Max companies processed per run, to respect provider quotas
 }
 
 
@@ -67,16 +67,18 @@ def find_mails_dag():
         )
 
         query = """
-            SELECT AVG(jr.score_relevancy) AS avg_score, MAX(jr.score_relevancy) AS max_score,
-            c.id_company, c.company_name, c.website, c.primary_type
-            cl.id_location, cl.city, cl.country
-            FROM job_relevancy as jr 
-                INNER JOIN job_offer as job_offer ON jr.id_offer = job_offer.id_offer
-                INNER JOIN company as c ON job_offer.id_company = c.id_company 
-                INNER JOIN company_location as cl ON c.id_company = cl.id_company
+            SELECT 
+                AVG(jr.score_relevancy) AS avg_score, 
+                MAX(jr.score_relevancy) AS max_score,
+                MAX(COALESCE(job_offer.posted_at, job_offer.collected_at)) AS last_offer_date,
+                c.id_company, c.company_name, c.website, c.primary_type,
+                cl.id_location, cl.city, cl.country
+            FROM job_relevancy AS jr 
+                INNER JOIN job_offer AS job_offer ON jr.id_offer = job_offer.id_offer
+                INNER JOIN company AS c ON job_offer.id_company = c.id_company 
+                INNER JOIN company_location AS cl ON c.id_company = cl.id_company
             WHERE cl.country = ANY(%(countries)s)
-            AND (cardinality(%(cities)s) = 0 OR city = ANY(%(cities)s))
-            AND max_score >= %(min_grade)s
+            AND (cardinality(%(cities)s) = 0 OR cl.city = ANY(%(cities)s))
             AND c.id_company NOT IN (
                 SELECT se.id_company
                 FROM staging.company_emails se,
@@ -85,7 +87,10 @@ def find_mails_dag():
                 HAVING COUNT(DISTINCT se.collected_at) >= 3
                     OR MAX((contact->>'score')::NUMERIC(3,2)) >= 0.8
             )
-            ORDER BY max_score DESC
+            GROUP BY c.id_company, c.company_name, c.website, c.primary_type,
+                    cl.id_location, cl.city, cl.country
+            HAVING MAX(jr.score_relevancy) >= %(min_grade)s
+            ORDER BY last_offer_date DESC, max_score DESC
             LIMIT %(limit)s
         """
         
