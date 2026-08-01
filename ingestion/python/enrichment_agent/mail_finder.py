@@ -171,6 +171,25 @@ class MailScrapping:
             return ""
 
 
+def _extract_text(content) -> str:
+    """
+    response.content can be a str or a list of content blocks (text/tool_use)
+    depending on whether the model used tools internally (e.g. google_search
+    grounding). Normalize it into a plain string for downstream processing.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+        return "\n".join(parts)
+    return str(content)
+
+
 class MailGrounder:
     """Node 2: Gemini with native Google Search grounding -> LLM extracts emails."""
 
@@ -201,7 +220,7 @@ class MailGrounder:
         # 1. Grounded search: Gemini searches the web and returns free text.
         try:
             response = call_with_retry(lambda: self._grounded_llm.invoke(prompt))
-            grounded_text = response.content
+            grounded_text = _extract_text(response.content)
             print(f"🌐 find_mails (grounder): {len(grounded_text)} grounded chars for {company}")
         except Exception as e:
             print(f"❌ find_mails (grounder): grounding error for {company}: {e}")
