@@ -2,7 +2,7 @@ INSERT INTO analytics.company_contact (id_company, id_location, email, confidenc
 SELECT DISTINCT ON (email)
     se.id_company,
     se.id_location,
-    (contact->>'email')::TEXT,
+    (contact->>'email')::TEXT AS email,
     (contact->>'score')::FLOAT,
     contact->>'reason',
     contact->>'source',
@@ -17,3 +17,4 @@ ON CONFLICT (email) DO UPDATE
         source = EXCLUDED.source,
         collected_at = EXCLUDED.collected_at
     WHERE EXCLUDED.confidence > analytics.company_contact.confidence
+RETURNING id_contact, email
