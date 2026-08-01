@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 
 from database import Database
+from APIendpoint import QuotaExceededError  
 from LLMprovider import LLM
 from datasets import SILVER_OFFERS, FETCH_CONTACTS
 from mail_finder import build_find_mails_graph, CompanyState
