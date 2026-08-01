@@ -10,7 +10,7 @@ import json
 from database import Database
 from LLMprovider import LLM
 from datasets import SILVER_OFFERS, FETCH_CONTACTS
-from find_mails_graph import build_find_mails_graph, CompanyState
+from mail_finder import build_find_mails_graph, CompanyState
 
 
 # ___ Configuration via Airflow Variables __________________________________________
