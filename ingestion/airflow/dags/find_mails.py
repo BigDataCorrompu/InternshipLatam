@@ -101,7 +101,7 @@ def find_mails_dag():
             "limit": config["batch_limit"],
         }
 
-        companies = db.fetch_all(query, params)
+        companies = db.execute(query, params)
 
         if not companies:
             raise AirflowSkipException("No target companies found matching current criteria — skipping run")
