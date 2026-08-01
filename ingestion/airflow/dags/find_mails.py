@@ -85,7 +85,7 @@ def find_mails_dag():
                 FROM staging.company_emails se,
                     LATERAL jsonb_array_elements(se.raw_result) AS contact
                 GROUP BY se.id_company
-                HAVING COUNT(DISTINCT se.collected_at) >= 3
+                HAVING COUNT(DISTINCT se.collected_at) >= 2
                     OR MAX((contact->>'score')::NUMERIC(3,2)) >= 0.8
             )
             GROUP BY c.id_company, c.company_name, c.website, c.primary_type,
@@ -157,7 +157,6 @@ def find_mails_dag():
         rows = [
             (row[0], row[1], row[2])
             for row in result
-            if row[2]
         ]
         
         if not row:
