@@ -159,7 +159,7 @@ def find_mails_dag():
             for row in results
         ]
         
-        if not row:
+        if not rows:
             print("⚠️  find_mails: no emails found across the whole batch, nothing to insert")
             return
 
