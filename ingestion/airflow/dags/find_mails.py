@@ -122,7 +122,7 @@ def find_mails_dag():
         llm = LLM()
         graph = build_find_mails_graph(
             llm,
-            hunter_api_key=None,
+            hunter_api_key=Variable.get("HUNTER_APP_KEY"),
             high_relevance_grade=config["high_relevance_grade"],
         )
 
