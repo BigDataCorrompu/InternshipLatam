@@ -218,6 +218,116 @@ class PlacesAPI(GeoAPI):
 
 
 
+class PlacesEssentialsAPI(GeoAPI):
+    """Étape 1 : vérifie l'existence + récupère place_id. Gratuit, illimité."""
+    BASE_URL = 'https://places.googleapis.com'
+    ENDPOINTS = {"search_text": 'v1/places:searchText'}
+
+    def __init__(self, api_key: str = None):
+        super().__init__(api_key or os.getenv('MAPS_APP_KEY'))
+        self.headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": self.api_key,
+            "X-Goog-FieldMask": "places.id,places.name",
+        }
+
+    def search_place(self, company: str, location: str, **kwargs):
+        params = {"textQuery": f"{company}, {location}"}
+        params = self._generate_params(params, **kwargs)
+        result = self._call("search_text", params)
+        if not result or not result.get("places"):
+            return None
+        return result["places"][0].get("id")
+
+    def _call(self, endpoint: str, params: dict):
+        url = self.BASE_URL + "/" + self.ENDPOINTS[endpoint]
+        response = requests.post(url, headers=self.headers, json=params)
+        if response.status_code == 429:
+            raise QuotaExceededError(response.text[:200])
+        if response.status_code != 200:
+            raise Exception(f"HTTP {response.status_code} : {response.text}")
+        return response.json()
+
+
+
+# Pro 5000 free request per month
+class PlacesEssentialsAPI(GeoAPI):
+    """Étape 1 : vérifie l'existence + récupère place_id. Gratuit, illimité."""
+    BASE_URL = 'https://places.googleapis.com'
+    ENDPOINTS = {"search_text": 'v1/places:searchText'}
+
+    def __init__(self, api_key: str = None):
+        super().__init__(api_key or os.getenv('MAPS_APP_KEY'))
+        self.headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": self.api_key,
+            "X-Goog-FieldMask": "places.id,places.name",
+        }
+
+    def search_place(self, company: str, location: str, **kwargs):
+        params = {"textQuery": f"{company}, {location}"}
+        params = self._generate_params(params, **kwargs)
+        result = self._call("search_text", params)
+        if not result or not result.get("places"):
+            return None
+        return result["places"][0].get("id")
+
+    def _call(self, endpoint: str, params: dict):
+        url = self.BASE_URL + "/" + self.ENDPOINTS[endpoint]
+        response = requests.post(url, headers=self.headers, json=params)
+        if response.status_code == 429:
+            raise QuotaExceededError(response.text[:200])
+        if response.status_code != 200:
+            raise Exception(f"HTTP {response.status_code} : {response.text}")
+        return response.json()
+
+
+class PlaceDetailsAPI(GeoAPI):
+    """Étape 2 : récupère adresse/coordonnées à partir du place_id. Tier Pro, 5000/mois gratuit."""
+    BASE_URL = 'https://places.googleapis.com'
+    ENDPOINTS = {"details": 'v1/places/{place_id}'}
+
+    def __init__(self, api_key: str = None):
+        super().__init__(api_key or os.getenv('MAPS_APP_KEY'))
+        self.headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": self.api_key,
+            "X-Goog-FieldMask": (
+                "displayName",
+                "formattedAddress",
+                "location",
+            )
+        }
+
+    def search_place(self, place_id: str, **kwargs):
+        result = self._call_details(place_id)
+        if not result:
+            return None
+        return self._map_result(result)
+
+    def _call_details(self, place_id: str):
+        url = self.BASE_URL + f"/v1/places/{place_id}"
+        response = requests.get(url, headers=self.headers)
+        if response.status_code == 429:
+            raise QuotaExceededError(response.text[:200])
+        if response.status_code != 200:
+            raise Exception(f"HTTP {response.status_code} : {response.text}")
+        return response.json()
+
+    def _map_result(self, result: dict) -> dict:
+        return {
+            "company_name": result.get("displayName", {}).get("text"),
+            "address":      result.get("formattedAddress"),
+            "lat":          result.get("location", {}).get("latitude"),
+            "lon":          result.get("location", {}).get("longitude"),
+        }
+
+    def _extract_results(self, response): return [response]
+    def _has_next_page(self, response, page): return False
+    def _next_page(self, response, page): raise NotImplementedError
+
+
+
 # ──────────────────────────────────────────
 # Jsearch/CareerJet
 # ──────────────────────────────────────────

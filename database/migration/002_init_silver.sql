@@ -13,12 +13,14 @@ DROP TABLE IF EXISTS analytics.company CASCADE;
 CREATE TABLE analytics.company (
     id_company      SERIAL          PRIMARY KEY,
     company_name    VARCHAR(150)    NOT NULL,
+    raw_names       TEXT[]          DEFAULT '{}',
     website         VARCHAR(500),
     primary_type    VARCHAR(100),
     collected_at    TIMESTAMPTZ     DEFAULT NOW(),
 
     UNIQUE (company_name)              -- ajouté : nécessaire pour ON CONFLICT (company_name)
 );
+
 
 -- ============================================================
 -- 2. company_location — dimension, une ligne par filiale
