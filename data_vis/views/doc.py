@@ -6,7 +6,6 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DOCS_ORDER = {
-    "👋 Exemple Prompt to use": "StreamlitPrompt.md",
     "🏠 Project Overview": "ProjectOverview.md",
     "⚙️ Pipeline": "Pipeline.md",
     "🥉 Bronze Layer": "BronzeTable.md",

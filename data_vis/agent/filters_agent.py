@@ -8,6 +8,15 @@ CONTEXT = """
         on top of whatever is already filtered. Only include an action or field if the user
         clearly mentions it — otherwise leave it out / null.
 
+        IMPORTANT: is_remote, min_score, max_score, and date_range are SEPARATE top-level
+        fields, NOT actions. Never put them inside the `actions` list. Set them directly
+        as their own field in the output:
+        - "remote jobs only" / "hybrid" → set is_remote=true as a top-level field.
+        - "on-site only" → set is_remote=false as a top-level field.
+        - score/date requests → set min_score/max_score/date_range as top-level fields.
+        The `actions` list is ONLY for: country, city, companies, contract_types,
+        seniority, offer_languages, keywords.
+
         Per-field formatting rules (apply these when producing `values` for each field):
 
         - country: full country names (e.g. "Chile", "Argentina", "Uruguay"), not codes.
