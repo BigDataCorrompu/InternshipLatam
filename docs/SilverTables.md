@@ -27,11 +27,11 @@ erDiagram
     TEXT[] skills_frameworks
     TEXT[] skills_aptitudes
     TEXT[] skills_soft
-    TEXT prompt_version
     TIMESTAMPTZ collected_at
   }
   job_relevancy {
     VARCHAR id_offer FK
+    INT id_prompt FK
     FLOAT score_relevancy
     FLOAT score_job
     FLOAT score_skills
@@ -41,7 +41,6 @@ erDiagram
     FLOAT score_work_mode
     FLOAT score_company
     TEXT explanation
-    INT id_prompt FK
     TIMESTAMPTZ collected_at
   }
   prompt_relevancy {
@@ -53,6 +52,7 @@ erDiagram
   company {
     INT id_company PK
     VARCHAR company_name
+    TEXT[] raw_names
     VARCHAR website
     VARCHAR primary_type
     TIMESTAMPTZ collected_at

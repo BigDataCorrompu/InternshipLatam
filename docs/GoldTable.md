@@ -1,5 +1,8 @@
 ## Schema Gold (Materialized view)
 
+The Gold layer exposes multiple materialized views tailored to different consumers (dashboard, monitoring, agent queries). `job_offer` is the primary denormalized view feeding the Streamlit dashboard; additional views cover collection monitoring (query performance, email discovery rate, quality distribution by search parameter) and are documented separately.
+
+
 ```mermaid
 erDiagram
     job_offer {
