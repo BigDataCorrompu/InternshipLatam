@@ -632,7 +632,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
     display_df = display_df.sort_values("_is_selected", ascending=False, kind="stable")
 
     show_cols = [c for c in ["job_title", "company_name", "city", "country_full",
-                             "seniority", "languages", "date", "score_relevancy"]
+                             "seniority", "languages", "date", "score_relevancy", "offer_url"]
                  if c in display_df.columns]
 
     display_df.insert(0, "Select", display_df["_is_selected"])
@@ -640,7 +640,7 @@ def render_offers_table(d: pd.DataFrame) -> None:
     # ── NOUVEAU : MARQUAGE VISUEL DE L'OFFRE INSPECTÉE DANS LE TABLEAU ──
     # On crée une copie temporaire pour l'affichage du tableau
     table_to_edit = display_df[["Select", "job_id"] + show_cols].copy()
-    
+
     # On récupère l'ID de l'offre actuellement choisie dans le menu déroulant du bas
     active_job_id = st.session_state.get("details_offer_selector")
     
@@ -668,6 +668,9 @@ def render_offers_table(d: pd.DataFrame) -> None:
             "languages": st.column_config.TextColumn("Languages", width="small"),
             "date": st.column_config.TextColumn("Published", width="small"),
             "score_relevancy": st.column_config.NumberColumn("Relevancy", width="small"),
+            "offer_url": st.column_config.LinkColumn(
+                "Offer", display_text=r"https?://(?:www\.)?([^/]+)", width="small",
+            ),
         },
         key="offers_editor",
     )
