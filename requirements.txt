@@ -1,0 +1,17 @@
+
+pandas>=3.0,<4
+plotly>=6.8,<7
+streamlit>=1.58,<2
+
+# DashboardAgent — LLM + recherche web
+langchain>=1.0,<2
+langchain-core>=1.0,<2
+langchain-mistralai>=1.0,<2
+langchain-groq>=1.1.3           # fallback cloud (Ollama résout en localhost, inutilisable ici)
+langchain_tavily>=0.2.18,<1     # search_web_tool
+
+
+# requirements-common.txt
+pydantic>=2,<3
+python-dotenv>=1.0
+rapidfuzz>=3,<4
