@@ -4,6 +4,7 @@ from airflow.exceptions import AirflowSkipException
 import traceback
 from datasets import BRONZE_OFFERS, STAGING_ENRICHED
 from database import Database
+from APIendpoint import PlacesAPIId, PlacesAPIDetails
 
 
 from datetime import datetime
@@ -14,8 +15,9 @@ logger = logging.getLogger(__name__)
 
 SAVE_EVERY = 10        # flush vers staging tous les N enrichissements
 MAX_PER_RUN = None     # None = all ; un int pour lisser le rattrapage
-
-
+ 
+# Configurable via Airflow Variable "find_location_min_score" (défaut : 8)
+DEFAULT_MIN_SCORE_LOCATION = 6
 
 
 SELECT_PENDING = """
@@ -23,15 +25,28 @@ SELECT_PENDING = """
     FROM raw.job_offer b
     LEFT JOIN staging.enriched_offers s ON s.id_offer = b.id_job
     WHERE s.id_offer IS NULL
+    ORDER BY collected_at DESC;
 """
 
 SELECT_PROFILE = """
     SELECT id_prompt, prompt
     FROM analytics.prompt_relevancy
     ORDER BY created_at DESC
-    LIMIT 1
+    LIMIT 1;
 """
 
+SELECT_EXISTING_LOCATIONS = """
+    SELECT
+        c.id_company,
+        c.company_name,
+        c.raw_names,
+        cl.id_location,
+        cl.city,
+        cl.country,
+        cl.source
+    FROM analytics.company c
+    JOIN analytics.company_location cl ON cl.id_company = c.id_company;
+"""
 
 def get_db() -> Database:
     return Database(
@@ -66,6 +81,10 @@ def silver_enrichment():
         llm_model_name = llm.enrichement.model
 
         db = get_db()
+        places_id = PlacesAPIId()
+        places_details = PlacesAPIDetails()
+
+        id_tracking = {}
 
         # 1 — Profil utilisateur
         prompt_rows = db.execute(SELECT_PROFILE)
@@ -103,6 +122,30 @@ def silver_enrichment():
             try:
                 state = map_bronze_to_JobOfferState(row) | profile_state
                 result = graph.invoke(state)
+
+                company = result.get("company")
+                city = result.get("city")
+                country = result.get("country")
+
+                place_data = {}
+                in_base_id = db.execute(SELECT_EXISTING_LOCATIONS.format())
+                # if grade high enough company is relevant
+                if result.get("score_relevancy") > DEFAULT_MIN_SCORE_LOCATION:
+                    # Search if the localisation isn't registered in the database already
+                    
+                    # if no, call text search id
+                    if not in_base_id:
+                        id = places_id.search_id(result).get("id")
+                        # if id already gathered in the dag assign the datas else query the api
+                        if ( place_data := id_tracking.get(id)) is not None:
+                            pass
+                        else:
+                            place_data = places_details.search_details(id)
+                        result.update(place_data)
+                else:
+                    # resolve city location
+
+
 
                 buffer.append((id_job, json.dumps(result, default=str), llm_model_name))
                 ok += 1

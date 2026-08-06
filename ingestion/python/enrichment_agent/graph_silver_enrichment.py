@@ -255,16 +255,16 @@ route_to_extract_company = make_binary_route_node(
     primary_key="company_name",
     condition=[None, 'null', '', "Empresa confidencial"],
     node_if_true=['extract_company'],
-    node_if_false=['find_location']
+    node_if_false=['extract_attributes_node']
 )
 
 # Can we keep dealing with this offer 
-route_company_to_end = make_binary_route_node(
-    primary_key="company_name",
-    condition=[None, 'null', '', "Empresa confidencial"],
-    node_if_true=[END],
-    node_if_false=["find_location"]
-)
+# route_company_to_end = make_binary_route_node(
+#     primary_key="company_name",
+#     condition=[None, 'null', '', "Empresa confidencial"],
+#     node_if_true=[END],
+#     node_if_false=["find_location"]
+# )
 
 
 
@@ -278,7 +278,6 @@ def route_after_find_location(state: JobOfferState):
 
 
 
-
 # =========================== Graph intialisation ===========================
 builder = StateGraph(JobOfferState)
 
@@ -286,7 +285,7 @@ builder = StateGraph(JobOfferState)
 builder.add_conditional_edges(
     START,
     route_to_extract_company,
-    ['find_location', 'extract_company']
+    ['extract_company', 'extract_attributes_node']
 )
 
 # Company ______________________________________________________________________________
@@ -295,29 +294,8 @@ builder.add_sequence([
     ("verify_company", verify_company),
 ])
 
-builder.add_conditional_edges(
-    "verify_company",
-    route_company_to_end,
-    ["find_location", END]
-)
-
-# Location (La boucle d'essai) _________________________________________________________
-# Ajout explicite des nœuds
-builder.add_node("find_location", find_location)
-builder.add_node("extract_location", extract_location_node)
-
-# La condition après find_location
-builder.add_conditional_edges(
-    "find_location",
-    route_after_find_location,
-    {
-        "extract_location": "extract_location",
-        "extract_attributes_node": "extract_attributes_node"
-    }
-)
-
-# Si on passe par l'enrichissement, on retourne tester
-builder.add_edge("extract_location", "find_location")
+# Peu importe si company est valide ou pas, on continue toujours vers l'enrichissement
+builder.add_edge("verify_company", "extract_attributes_node")
 
 # Attributes & Skills __________________________________________________________________
 builder.add_sequence([
@@ -325,7 +303,6 @@ builder.add_sequence([
     ("extract_skills", extract_skills),
 ])
 
-# De skills, on passe directement au scoring
 builder.add_edge("extract_skills", "determine_relevancy")
 
 # Scoring ______________________________________________________________________________
@@ -334,7 +311,5 @@ builder.add_sequence([
     ("calculate_relevancy", calculate_relevancy)
 ])
 builder.add_edge("calculate_relevancy", END)
-
-
 
 graph = builder.compile()

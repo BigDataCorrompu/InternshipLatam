@@ -214,6 +214,7 @@ def map_bronze_to_JobOfferState(row: dict) -> JobOfferState:
         "lon": row.get("longitude"),                 
         "phone": None,
         "business_status": None,
+        "source": None,
 
         # ── analytics.company_contact ─────────────────────────────
         "contacts": [],
