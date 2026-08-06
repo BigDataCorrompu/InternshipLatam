@@ -225,7 +225,7 @@ class PlacesAPIId(PlacesAPI):
             "Content-Type": "application/json",
             "X-Goog-Api-Key": self.api_key,
             "X-Goog-FieldMask": (
-                "places.id",
+                "places.id"
 
             )
         }
