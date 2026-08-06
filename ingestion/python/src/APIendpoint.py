@@ -260,7 +260,7 @@ class PlacesAPIDetails(PlacesAPI):
         return self._map_result_details(result)
 
     def _call_details(self, place_id: str) -> dict:
-        url = self.BASE_URL + self.ENDPOINTS["details"].format(place_id=place_id)
+        url = self.BASE_URL + "/" + self.ENDPOINTS["details"].format(place_id=place_id)
         response = requests.get(url, headers=self.headers)
         if response.status_code == 429:
             raise QuotaExceededError(response.text[:200])
