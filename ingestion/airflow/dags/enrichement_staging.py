@@ -171,7 +171,7 @@ def silver_enrichment():
                     return {
                         "lat": coords[0], "lon": coords[1],
                         "city": candidate.strip(), "country": country,
-                        "geo_source": "geonames",
+                        "source": "geonames",
                     }
 
             return None
@@ -202,7 +202,7 @@ def silver_enrichment():
                 return {
                     "id_company": existing["id_company"],
                     "id_location": existing["id_location"],
-                    "geo_source": "existing",
+                    "source": "existing",
                 }
 
             if score is not None and score > min_score_location:
@@ -220,13 +220,13 @@ def silver_enrichment():
                             id_tracking[place_id] = place_data
 
                     if place_data:
-                        return {**place_data, "place_id": place_id, "geo_source": "find_place"}
+                        return {**place_data, "place_id": place_id, "source": "find_place"}
 
                 # pas d'id, ou details vide -> repli
-                return forward_geocode(location_raw, city, country, api_source) or {"geo_source": "skipped"}
+                return forward_geocode(location_raw, city, country, api_source) or {"source": "skipped"}
 
             # score insuffisant -> repli direct, pas d'appel Find Place
-            return forward_geocode(location_raw, city, country, api_source) or {"geo_source": "skipped"}
+            return forward_geocode(location_raw, city, country, api_source) or {"source": "skipped"}
 
         # ---------------------------------------------------------- boucle principale
 
@@ -242,7 +242,8 @@ def silver_enrichment():
             existing_index = lookup_existing_locations(company_names)
 
             for entry in results_batch:
-                entry["result"]["geo"] = resolve_location(entry, existing_index)
+                geo_result = resolve_location(entry, existing_index)
+                entry["result"].update(geo_result)
 
             db.bulk_insert(
                 table="staging.enriched_offers",

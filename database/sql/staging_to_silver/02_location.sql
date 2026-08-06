@@ -9,6 +9,7 @@ SELECT DISTINCT ON (c.id_company, s.raw_result->>'city', s.raw_result->>'country
     (s.raw_result->>'lon')::float,
     s.raw_result->>'phone',
     s.raw_result->>'business_status'
+    s.raw_result->>'source
 FROM staging.enriched_offers s
 JOIN analytics.company c ON c.company_name = s.raw_result->>'company_name'
 WHERE s.raw_result->>'city' IS NOT NULL
