@@ -206,11 +206,10 @@ def silver_enrichment():
                 }
 
             if score is not None and score > min_score_location:
-                place_id_result = places_id.search_id(
+                place_id = places_id.search_id(
                     company=company_name,
                     location=f"{city}, {country}" if city else country,
                 )
-                place_id = place_id_result.get("id") if place_id_result else None
 
                 if place_id:
                     if place_id in id_tracking:
