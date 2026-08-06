@@ -18,10 +18,13 @@ SELECT DISTINCT ON (LEFT(s.raw_result->>'offer_url', 500))
     (s.raw_result->>'published_at')::timestamptz,
     (s.raw_result->>'collected_at')::timestamptz
 FROM staging.enriched_offers s
-JOIN analytics.company c ON c.company_name = s.raw_result->>'company_name'
+LEFT JOIN analytics.company c ON c.company_name = s.raw_result->>'company_name'
 LEFT JOIN analytics.company_location cl ON cl.id_company = c.id_company 
     AND cl.city = s.raw_result->>'city' AND cl.country = s.raw_result->>'country'
-WHERE s.raw_result->>'company_name' NOT IN ('null', '', 'Empresa confidencial')
+WHERE (
+    s.raw_result->>'company_name' IS NULL
+    OR s.raw_result->>'company_name' NOT IN ('null', '', 'Empresa confidencial')
+)
   AND NOT EXISTS (
       SELECT 1 FROM analytics.job_offer jo2
       WHERE jo2.offer_url = LEFT(s.raw_result->>'offer_url', 500)
