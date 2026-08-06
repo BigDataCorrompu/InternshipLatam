@@ -76,7 +76,6 @@ def silver_enrichment():
         db = get_db()
         places_id = PlacesAPIId()
         places_details = PlacesAPIDetails()
-        mapbox = MapboxAPI()
  
         id_tracking: dict[str, dict] = {}  # place_id -> details, cache global au run
  
