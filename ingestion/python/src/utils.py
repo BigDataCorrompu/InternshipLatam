@@ -6,7 +6,13 @@ from database import Database
 from bucket import Bucket
 import langdetect
 logger = logging.getLogger(__name__)
-
+import re
+# JSearch : "Montevideo, Departamento de Montevideo • a través de Jooble"
+# Le séparateur "•" isole toujours la partie utile, quelle que soit la langue
+# du suffixe ("a través de", "through", "via"...).
+RE_VIA_BULLET = re.compile(r"\s*•.*$")
+# "(y 1 ubicación más)" / "(y 3 ubicaciones más)"
+RE_MORE_LOCATIONS = re.compile(r"\s*\(y\s+\d+\s+ubicaci[óo]n(?:es)?\s+m[áa]s\)", re.IGNORECASE)
 
 def write_json(filepath: str, filename: str, data: dict) -> None:
     """Write a dictionary to a JSON file.
@@ -227,3 +233,23 @@ def detect_language(text: str) -> str | None:
         return langdetect.detect(text)
     except langdetect.LangDetectException:
         return None
+
+
+def clean_location_raw(location_raw: str, api_source: str = None) -> str | None:
+    """
+    Nettoie location_raw selon la source.
+    - jsearch   : retire tout après le "•" (suffixe plateforme), et les
+                  mentions "(y N ubicaciones más)".
+    - careerjet : déjà propre en pratique (city/country remplis), retour tel quel.
+    """
+    if not location_raw:
+        return None
+
+    cleaned = location_raw
+
+    if api_source == "jsearch" or "•" in cleaned:
+        cleaned = RE_VIA_BULLET.sub("", cleaned)
+        cleaned = RE_MORE_LOCATIONS.sub("", cleaned)
+
+    cleaned = cleaned.strip(" ,-")
+    return cleaned or None

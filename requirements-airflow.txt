@@ -30,6 +30,8 @@ ddgs>=9,<10
 country_converter>=1.3,<2
 pycountry
 langchain_tavily>=0.2.18,<1
+geonamescache==2.0.0
 
 # Pandas contraint par Airflow 2.9.1 (constraints-3.12.txt fige 2.1.4)
 pandas>=2.1,<3
+
