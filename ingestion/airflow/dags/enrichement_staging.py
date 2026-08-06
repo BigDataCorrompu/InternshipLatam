@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 SAVE_EVERY = 10        # flush vers staging tous les N enrichissements
-MAX_PER_RUN = 3     # None = all ; un int pour lisser le rattrapage
+MAX_PER_RUN = None     # None = all ; un int pour lisser le rattrapage
  
 # Configurable via Airflow Variable "find_location_min_score" (défaut : 8)
 DEFAULT_MIN_SCORE_LOCATION = 6
