@@ -35,7 +35,6 @@ FROM matched m
 WHERE m.existing_id_company IS NULL
 ON CONFLICT (company_name) DO NOTHING;
 
-
 UPDATE analytics.company c
 SET
     raw_names = CASE
@@ -44,6 +43,11 @@ SET
     END,
     company_name = CASE
         WHEN m.geo_source = 'find_place' AND m.raw_company_name IS NOT NULL
+         AND NOT EXISTS (
+             SELECT 1 FROM analytics.company other
+             WHERE other.company_name = m.raw_company_name
+               AND other.id_company <> c.id_company
+         )
         THEN m.raw_company_name
         ELSE c.company_name
     END,
@@ -59,6 +63,3 @@ SET
     END
 FROM matched m
 WHERE m.existing_id_company = c.id_company;
-
-
-DROP TABLE IF EXISTS matched;
