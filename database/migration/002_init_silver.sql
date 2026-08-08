@@ -146,8 +146,11 @@ CREATE TABLE analytics.prompt_relevancy (
 -- ============================================================
 -- Index : To lookup fast into database to match an offer with an already registered company
 -- ============================================================
-CREATE INDEX idx_company_location_lookup
+CREATE INDEX IF NOT EXISTS idx_company_location_lookup
     ON analytics.company_location(id_company, city, country);
 
-CREATE INDEX idx_company_name 
+CREATE INDEX IF NOT EXISTS idx_company_name 
     ON analytics.company(company_name);
+
+CREATE INDEX IF NOT EXISTS idx_company_raw_names 
+    ON analytics.company USING GIN (raw_names);
