@@ -6,13 +6,13 @@
     },
     "queries": [
 
-        {"keywords": "junior data engineer", "location": "Buenos Aires", "locale_code": "es_AR"},
+        {"keywords": "data engineer", "location": "Buenos Aires", "locale_code": "es_AR"},
         {"keywords": "data engineer llm", "location": "Buenos Aires", "locale_code": "es_AR"},
 
-        {"keywords": "junior data engineer", "location": "Santiago", "locale_code": "es_CL"},
+        {"keywords": "data engineer", "location": "Santiago", "locale_code": "es_CL"},
         {"keywords": "data engineer llm", "location": "Santiago", "locale_code": "es_CL"},
         
-        {"keywords": "junior data engineer", "location": "Montevideo", "locale_code": "es_UY"},
+        {"keywords": "data engineer", "location": "Montevideo", "locale_code": "es_UY"},
         {"keywords": "data engineer llm", "location": "Montevideo", "locale_code": "es_UY"}
     ]
 }
