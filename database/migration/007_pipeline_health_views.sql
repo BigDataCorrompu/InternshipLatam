@@ -34,42 +34,39 @@ WITH staging_state AS (
             IN ('', 'null', 'Empresa confidencial'))           AS no_company
     FROM staging.enriched_offers s
     LEFT JOIN analytics.job_offer o ON o.id_offer = s.id_offer
+),
+counts AS (
+    SELECT
+        (SELECT COUNT(*) FROM raw.job_offer)                        AS bronze_total,
+        (SELECT COUNT(*) FROM staging.enriched_offers)              AS staging_total,
+        (SELECT COUNT(*) FROM analytics.job_offer)                  AS silver_total,
+        (SELECT COUNT(*) FROM analytics.company)                    AS companies_total,
+
+        (SELECT COUNT(*)
+           FROM raw.job_offer b
+           LEFT JOIN staging.enriched_offers s ON s.id_offer = b.id_job
+          WHERE s.id_offer IS NULL)                                 AS pending_enrichment,
+
+        (SELECT COUNT(*) FROM staging_state
+          WHERE not_in_silver AND NOT no_company)                   AS pending_silver,
+
+        (SELECT COUNT(*) FROM staging_state
+          WHERE not_in_silver AND no_company)                       AS unusable_no_company
 )
 SELECT
-    (SELECT COUNT(*) FROM raw.job_offer)                        AS bronze_total,
-    (SELECT COUNT(*) FROM staging.enriched_offers)              AS staging_total,
-    (SELECT COUNT(*) FROM analytics.job_offer)                  AS silver_total,
-    (SELECT COUNT(*) FROM analytics.company)                    AS companies_total,
+    bronze_total, staging_total, silver_total, companies_total,
+    pending_enrichment, pending_silver, unusable_no_company,
 
-    -- Real backlog: bronze rows not enriched yet (DAG needs to run)
-    (SELECT COUNT(*)
-       FROM raw.job_offer b
-       LEFT JOIN staging.enriched_offers s ON s.id_offer = b.id_job
-      WHERE s.id_offer IS NULL)                                 AS pending_enrichment,
+    -- usable_base réutilise EXACTEMENT unusable_no_company (même filtre not_in_silver)
+    bronze_total - unusable_no_company                             AS usable_base,
 
-    -- Real backlog: enriched AND usable, but not transferred to Silver yet
-    (SELECT COUNT(*) FROM staging_state
-      WHERE not_in_silver AND NOT no_company)                   AS pending_silver,
+    ROUND(100.0 * silver_total / NULLIF(bronze_total, 0), 1)
+                                                                    AS conversion_pct,
 
-    -- Permanently unusable: no employer identified, will NEVER reach Silver
-    (SELECT COUNT(*) FROM staging_state
-      WHERE not_in_silver AND no_company)                       AS unusable_no_company,
-
-    -- Theoretical usable base (bronze minus known unusable rows)
-    (SELECT COUNT(*) FROM raw.job_offer)
-      - (SELECT COUNT(*) FROM staging_state WHERE no_company)   AS usable_base,
-
-    -- Raw conversion rate: Silver / Bronze
-    ROUND(100.0 * (SELECT COUNT(*) FROM analytics.job_offer)
-                / NULLIF((SELECT COUNT(*) FROM raw.job_offer), 0), 1)
-                                                                AS conversion_pct,
-
-    -- Adjusted rate: Silver / (Bronze - unusable) => true transfer health
-    ROUND(100.0 * (SELECT COUNT(*) FROM analytics.job_offer)
-                / NULLIF((SELECT COUNT(*) FROM raw.job_offer)
-                         - (SELECT COUNT(*) FROM staging_state WHERE no_company), 0), 1)
-                                                                AS transfer_health_pct;
-
+    ROUND(100.0 * silver_total
+                / NULLIF(bronze_total - unusable_no_company, 0), 1)
+                                                                    AS transfer_health_pct
+FROM counts;
 
 -- ============================================================================
 -- 2. QUERY PERFORMANCE — yield per API call configuration
