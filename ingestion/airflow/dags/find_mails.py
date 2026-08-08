@@ -80,6 +80,7 @@ def find_mails_dag():
                 INNER JOIN analytics.company_location AS cl ON c.id_company = cl.id_company
             WHERE cl.country = ANY(%(countries)s::text[])
             AND (cardinality(%(cities)s::text[]) = 0 OR cl.city = ANY(%(cities)s::text[]))
+            AND COALESCE(job_offer.published_at, job_offer.collected_at) >= NOW() - INTERVAL '14 days'
             AND c.id_company NOT IN (
                 SELECT se.id_company
                 FROM staging.company_emails se,
