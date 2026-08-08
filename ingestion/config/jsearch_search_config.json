@@ -1,7 +1,7 @@
 {
     "default_params": {
         "num_pages": 3,
-        "date_posted": "today",
+        "date_posted": "3days",
         "work_from_home": "false",
         "language": "en"
     },
