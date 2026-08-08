@@ -45,15 +45,18 @@ SET
         ELSE array_append(c.raw_names, m.raw_company_name)
     END,
     company_name = CASE
-        WHEN m.geo_source = 'find_place' THEN m.raw_company_name
+        WHEN m.geo_source = 'find_place' AND m.raw_company_name IS NOT NULL
+        THEN m.raw_company_name
         ELSE c.company_name
     END,
     website = CASE
-        WHEN m.geo_source = 'find_place' AND m.website IS NOT NULL THEN m.website
+        WHEN m.geo_source = 'find_place' AND m.website IS NOT NULL
+        THEN m.website
         ELSE c.website
     END,
     primary_type = CASE
-        WHEN m.geo_source = 'find_place' AND m.primary_type IS NOT NULL THEN m.primary_type
+        WHEN m.geo_source = 'find_place' AND m.primary_type IS NOT NULL
+        THEN m.primary_type
         ELSE c.primary_type
     END
 FROM matched m

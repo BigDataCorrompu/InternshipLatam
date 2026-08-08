@@ -248,8 +248,7 @@ class PlacesAPIDetails(PlacesAPI):
             "X-Goog-FieldMask": (
                 "addressComponents,"
                 "formattedAddress,"
-                "location,"
-                "types"
+                "location"
             )
         }
 
