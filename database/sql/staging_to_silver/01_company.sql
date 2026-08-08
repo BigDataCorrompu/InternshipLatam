@@ -1,3 +1,4 @@
+CREATE TEMP TABLE matched AS
 WITH incoming AS (
     SELECT DISTINCT ON (s.raw_result->>'company_name')
         s.raw_result->>'company_name'                 AS raw_company_name,
@@ -11,20 +12,17 @@ WITH incoming AS (
     ORDER BY s.raw_result->>'company_name',
              (s.raw_result->>'source' = 'find_place') DESC,
              s.collected_at DESC
-),
-
-matched AS (
-    SELECT
-        i.raw_company_name,
-        i.website,
-        i.primary_type,
-        i.geo_source,
-        c.id_company AS existing_id_company
-    FROM incoming i
-    LEFT JOIN analytics.company c
-        ON c.company_name = i.raw_company_name
-        OR i.raw_company_name = ANY(c.raw_names)
 )
+SELECT
+    i.raw_company_name,
+    i.website,
+    i.primary_type,
+    i.geo_source,
+    c.id_company AS existing_id_company
+FROM incoming i
+LEFT JOIN analytics.company c
+    ON c.company_name = i.raw_company_name
+    OR i.raw_company_name = ANY(c.raw_names);
 
 
 INSERT INTO analytics.company (company_name, raw_names, website, primary_type)
@@ -61,3 +59,6 @@ SET
     END
 FROM matched m
 WHERE m.existing_id_company = c.id_company;
+
+
+DROP TABLE IF EXISTS matched;
