@@ -72,7 +72,7 @@ def find_mails_dag():
                 AVG(jr.score_relevancy) AS average_grades, 
                 MAX(jr.score_relevancy) AS highest_grade,
                 MAX(COALESCE(job_offer.published_at, job_offer.collected_at)) AS last_offer_date,
-                c.id_company, c.company_name, c.website, c.primary_type,
+                c.id_company, c.company_name, c.website,
                 cl.id_location, cl.city, cl.country
             FROM analytics.job_relevancy AS jr 
                 INNER JOIN analytics.job_offer AS job_offer ON jr.id_offer = job_offer.id_offer
@@ -89,7 +89,7 @@ def find_mails_dag():
                 HAVING COUNT(DISTINCT se.collected_at) >= 2
                     OR MAX((contact->>'score')::NUMERIC(3,2)) >= 0.8
             )
-            GROUP BY c.id_company, c.company_name, c.website, c.primary_type,
+            GROUP BY c.id_company, c.company_name, c.website,
                     cl.id_location, cl.city, cl.country
             HAVING MAX(jr.score_relevancy) >= %(min_grade)s
             ORDER BY last_offer_date DESC, highest_grade DESC
@@ -131,7 +131,6 @@ def find_mails_dag():
             "id_company": company["id_company"],
             "company_name": company["company_name"],
             "website": company["website"],
-            "primary_type": company["primary_type"],
             "id_location": company["id_location"],
             "city": company["city"],
             "country": company["country"],

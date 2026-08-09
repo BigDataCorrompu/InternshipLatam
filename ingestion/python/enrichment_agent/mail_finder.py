@@ -48,7 +48,6 @@ class CompanyState(TypedDict):
     id_company: int
     company_name: str
     website: str
-    primary_type: str
 
     id_location: int
     city: str
@@ -99,7 +98,7 @@ class MailScrapping:
             ),
             output_key="search_queries_mails",
             schema=SearchQueryOutput,
-            fields=["company_name", "website", "city", "country", "primary_type"],
+            fields=["company_name", "website", "city", "country"],
         )
         self._llm_structured = llm.mailfinder.with_structured_output(EmailResults)
 
