@@ -206,6 +206,8 @@ def load_and_transform_dataframe(fingerprint: str) -> tuple[pd.DataFrame, dict]:
     df["company_name"] = df["company_name"].fillna("unknown")
     if "collected_at" in df.columns:
         df["collected_at"] = pd.to_datetime(df["collected_at"])
+    df["contract_type"] = df["contract_type"].fillna("not specified")   
+    df["seniority"] = df["seniority"].fillna("unknown")
 
     # ── Full country names (only for non-null rows) ──
     cc = coco.CountryConverter()
