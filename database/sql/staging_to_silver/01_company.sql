@@ -1,4 +1,3 @@
-CREATE TEMP TABLE matched AS
 WITH incoming AS (
     SELECT DISTINCT ON (s.raw_result->>'company_name')
         s.raw_result->>'company_name'                 AS raw_company_name,
@@ -12,17 +11,20 @@ WITH incoming AS (
     ORDER BY s.raw_result->>'company_name',
              (s.raw_result->>'source' = 'find_place') DESC,
              s.collected_at DESC
+),
+
+matched AS (
+    SELECT
+        i.raw_company_name,
+        i.website,
+        i.primary_type,
+        i.geo_source,
+        c.id_company AS existing_id_company
+    FROM incoming i
+    LEFT JOIN analytics.company c
+        ON c.company_name = i.raw_company_name
+        OR i.raw_company_name = ANY(c.raw_names)
 )
-SELECT
-    i.raw_company_name,
-    i.website,
-    i.primary_type,
-    i.geo_source,
-    c.id_company AS existing_id_company
-FROM incoming i
-LEFT JOIN analytics.company c
-    ON c.company_name = i.raw_company_name
-    OR i.raw_company_name = ANY(c.raw_names);
 
 
 INSERT INTO analytics.company (company_name, raw_names, website, primary_type)
@@ -35,6 +37,7 @@ FROM matched m
 WHERE m.existing_id_company IS NULL
 ON CONFLICT (company_name) DO NOTHING;
 
+
 UPDATE analytics.company c
 SET
     raw_names = CASE
@@ -42,12 +45,15 @@ SET
         ELSE array_append(c.raw_names, m.raw_company_name)
     END,
     company_name = CASE
-        WHEN m.geo_source = 'find_place' AND m.raw_company_name IS NOT NULL
-         AND NOT EXISTS (
-             SELECT 1 FROM analytics.company other
-             WHERE other.company_name = m.raw_company_name
-               AND other.id_company <> c.id_company
-         )
+        WHEN m.geo_source = 'find_place'
+             AND m.raw_company_name IS NOT NULL
+             -- Ne renomme jamais vers un nom déjà utilisé par une AUTRE entreprise,
+             -- sinon collision avec la contrainte UNIQUE(company_name).
+             AND NOT EXISTS (
+                 SELECT 1 FROM analytics.company c2
+                 WHERE c2.company_name = m.raw_company_name
+                   AND c2.id_company != c.id_company
+             )
         THEN m.raw_company_name
         ELSE c.company_name
     END,
