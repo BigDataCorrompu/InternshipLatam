@@ -50,33 +50,48 @@ extract_company = Extract(
 
 # =========================== Location handle ===========================
 class LocationRawOutput(BaseModel):
-    location_raw: str | None = Field(
-        description= ("A location hint suitable for a Google Maps query. "
-        "If you can enrich the existing location_raw with city/country/offer_description, do so. "
-        "If you find nothing additional, just return the existing location_raw unchanged.")
+    city: str | None = Field(
+        description=(
+            "The city where the company/position is located, if mentioned anywhere in the text "
+            "(job_title, offer_description, or the existing location_raw/city field). "
+            "Return the city name as written in the text. "
+            "Return null if no city is mentioned or inferable."
+        )
+    )
+    country: str | None = Field(
+        description=(
+            "The country where the company/position is located, if mentioned anywhere in the text. "
+            "Return the country name or code as written/implied in the text "
+            "(e.g. infer 'Chile' from 'Santiago' if the country isn't explicitly named but the city clearly indicates it). "
+            "Return null if truly no country can be determined."
+        )
     )
 
 extract_location = Extract(
     llm=llm.enrichement,
     task=(
-        "I need a location hint to start a Google Maps API query. I don't need a precise location, "
-        "just something that indicates where the company is located. "
-        "Combine information from location_raw, city, country, and offer_description."
+        "Also explicitly extract the city and country if they are mentioned or can be reasonably inferred "
+        "from the text (e.g. a well-known city implies its country)."
     ),
     output_key='location_raw',
     schema=LocationRawOutput,
     fields=['job_title', 'offer_description', 'location_raw', 'city', 'country']
 )
 
+
 def extract_location_node(state: JobOfferState) -> dict:
-    original_location = state.get("location_raw")
+    original_city = state.get("city")
+    original_country = state.get("country")
+
     result = extract_location(state)
-    result["_location_retry_attempted"] = True
-    if not result.get("location_raw") or result["location_raw"] == "null":
-        result["location_raw"] = original_location
+
+    # Ne jamais écraser une valeur déjà connue par une valeur vide/null du LLM
+    if not result.get("city") or result["city"] == "null":
+        result["city"] = original_city
+    if not result.get("country") or result["country"] == "null":
+        result["country"] = original_country
 
     return result
-
 
 
 verify_company = make_verify_included_node(
@@ -87,8 +102,6 @@ verify_company = make_verify_included_node(
 
 
 find_location = FindLocation(geo_api=placesAPI)
-
-
 
 
 # =========================== Attributes handle ===========================
@@ -144,6 +157,26 @@ class OfferAttribute(BaseModel):
             "NEVER three-letter codes (eng, spa, fra, por) and NEVER full language names."
         )
     )
+    city: str | None = Field(
+        description=(
+            "The city where the company/position is located, ONLY if the exact city name is "
+            "EXPLICITLY WRITTEN in the text (job_title, offer_description, or location_raw). "
+            "Copy it exactly as written. "
+            "NEVER guess, infer, or deduce a city that is not literally present in the text. "
+            "Return null if no city is explicitly mentioned."
+        )
+    )
+    country: str | None = Field(
+        description=(
+            "The country where the company/position is located, ONLY if the exact country name "
+            "is EXPLICITLY WRITTEN in the text (job_title, offer_description, or location_raw). "
+            "Copy it exactly as written. "
+            "NEVER guess, infer, or deduce a country from a city name or any other indirect clue — "
+            "the country itself must be literally present in the text. "
+            "Return null if no country is explicitly mentioned."
+        )
+    )
+
     @field_validator("is_remote", mode="before")
     @classmethod
     def normalize_remote(cls, v):
@@ -160,25 +193,31 @@ extract_attributes = Extract(
         'Find if the offer is remote, strictly from the text. '
         'Find the contract type, strictly from the text. '
         'Identify the language(s) required for this position, as ISO 639-1 two-letter codes ONLY '
-        '(e.g. "en", "es", "pt" — never 3-letter codes like "eng" or "spa").'
+        '(e.g. "en", "es", "pt" — never 3-letter codes like "eng" or "spa"). '
+        'Extract city and country ONLY if explicitly written in the text — never guess or infer them.'
     ),
     output_key='attributes',
     schema=OfferAttribute,
-    fields=['job_title', 'offer_description', 'is_remote']
+    fields=['job_title', 'offer_description', 'is_remote', 'location_raw', 'city', 'country']
 )
-
-
 
 
 def extract_attributes_node(state: JobOfferState) -> dict:
     result = extract_attributes(state)
+
     detected = detect_language(state.get("offer_description", ""))
     langs = result.get("spoken_languages_required") or []
     if detected and detected not in langs:
         langs = langs + [detected]
     result["spoken_languages_required"] = langs
-    return result
 
+    # Ne jamais écraser une valeur déjà connue par une valeur vide/null du LLM
+    if not result.get("city") or result["city"] == "null":
+        result["city"] = state.get("city")
+    if not result.get("country") or result["country"] == "null":
+        result["country"] = state.get("country")
+
+    return result
 
 
 # =========================== Skills handle ===========================
