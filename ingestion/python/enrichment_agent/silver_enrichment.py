@@ -403,7 +403,7 @@ class OfferRelevancy(BaseModel):
             "against my languages (provided in the system message). "
             "Use this STRICT RUBRIC for professional contexts: "
             "10 = I am Native, C2, or C1 in the required language. "
-            "7-8 = I am B2 (working proficiency) and the offer doesn't require native fluency. "
+            "8-9 = I am B2 (working proficiency) and the offer doesn't require native fluency. "
             "2-4 = I am A2 or B1. This is usually INSUFFICIENT for a professional environment unless the offer explicitly accepts beginners. "
             "0 = I do not speak the required language at all. "
             "If the language is not specified or you can't deduce it, return null."
@@ -411,8 +411,15 @@ class OfferRelevancy(BaseModel):
     )
     score_seniority: float | str | None = Field(
         description=(
-            "Seniority fit score from 0 to 10, comparing the seniority required by the offer against my profile "
-            "10 = perfect match, 0 = requires a seniority level I don't have. "
+            "Seniority fit score from 0 to 10, comparing the seniority REQUIRED by the offer "
+            "against MY OWN seniority level (stated in my profile). "
+            "Use this explicit scale based on the GAP between required and my level: "
+            "10 = exact match (offer requires my exact level). "
+            "4-6 = one level above mine (e.g. offer requires mid, I'm junior) — a stretch but plausible. "
+            "2-3 = two levels above mine (e.g. offer requires senior, I'm junior) — unlikely to be considered. "
+            "0-1 = far beyond my level (e.g. requires 10+ years experience, lead/head role) — unrealistic. "
+            "If the offer requires a LOWER seniority than mine (e.g. offer wants junior, I'm mid), "
+            "score 7-8, not 10 — it's a fit but likely underqualifying/underpaying for my level. "
             "If seniority is not specified or you can't deduce it, return null."
         )
     )
