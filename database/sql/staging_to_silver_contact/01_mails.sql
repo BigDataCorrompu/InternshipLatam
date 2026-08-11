@@ -12,7 +12,9 @@ FROM staging.company_emails se,
 WHERE contact->>'email' IS NOT NULL
 ORDER BY email, (contact->>'score')::FLOAT DESC, se.collected_at DESC
 ON CONFLICT (email) DO UPDATE
-    SET confidence = EXCLUDED.confidence,
+    SET id_company = EXCLUDED.id_company,
+        id_location = EXCLUDED.id_location,
+        confidence = EXCLUDED.confidence,
         explanation = EXCLUDED.explanation,
         source = EXCLUDED.source,
         collected_at = EXCLUDED.collected_at
