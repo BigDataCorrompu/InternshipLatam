@@ -125,6 +125,7 @@ def find_mails_dag():
             "min_grade": config["min_grade"],
             "limit": config["batch_limit"],
             "high_relevance_mail": config["high_relevance_mail"],
+            "high_relevance_grade": config["high_relevance_grade"],
         }
 
         companies = db.execute(query, params)
