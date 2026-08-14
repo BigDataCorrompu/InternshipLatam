@@ -35,3 +35,7 @@ geonamescache==2.0.0
 # Pandas contraint par Airflow 2.9.1 (constraints-3.12.txt fige 2.1.4)
 pandas>=2.1,<3
 
+# Mails sender
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.100.0
+

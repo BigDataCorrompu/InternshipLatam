@@ -110,15 +110,18 @@ class GeoAPI(API):
         raise NotImplementedError("Pas de pagination pour cette API")
 
 
-class MailAPI(API):
+class MailFinderAPI(API):
     @abstractmethod
     def search_mails(self):
         pass
 
+
+
+
 # ──────────────────────────────────────────
 # Hunter.io
 # ──────────────────────────────────────────
-class HunterAPI(MailAPI):
+class HunterAPI(MailFinderAPI):
     BASE_URL = "https://api.hunter.io/v2/"
     ENDPOINTS = {
         "email_finder": "email-finder",

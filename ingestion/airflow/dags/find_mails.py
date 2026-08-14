@@ -20,8 +20,9 @@ DEFAULT_CONFIG = {
     "target_countries": ["CL", "AR", "UY"],
     "target_cities": [],
     "min_grade": 5,           # Minimum highest_grade for a company to be processed at all
-    "high_relevance_grade": 8,  # Threshold used inside the graph's routing (grounder/hunter access)
+    "high_relevance_grade": 7.5,  # Threshold used inside the graph's routing (grounder/hunter access)
     "batch_limit": 15,        # Max companies processed per run, to respect provider quotas
+    "high_relevance_mail": 7
 }
 
 
@@ -66,7 +67,6 @@ def find_mails_dag():
             db_sslmode        = Variable.get("DB_SSLMODE",       default_var="require"),
             db_channelbinding = Variable.get("DB_CHANNELBIDING", default_var="disable"),
         )
-
         query = """
             SELECT 
                 AVG(jr.score_relevancy) AS average_grades, 
@@ -81,13 +81,36 @@ def find_mails_dag():
             WHERE cl.country = ANY(%(countries)s::text[])
             AND (cardinality(%(cities)s::text[]) = 0 OR cl.city = ANY(%(cities)s::text[]))
             AND COALESCE(job_offer.published_at, job_offer.collected_at) >= NOW() - INTERVAL '14 days'
-            AND c.id_company NOT IN (
-                SELECT se.id_company
-                FROM staging.company_emails se,
-                    LATERAL jsonb_array_elements(se.raw_result) AS contact
-                GROUP BY se.id_company
-                HAVING COUNT(DISTINCT se.collected_at) >= 2
-                    OR MAX((contact->>'score')::NUMERIC(3,2)) >= 0.8
+            AND (
+                -- Cas normal : entreprise jamais recherchée plus d'une fois
+                c.id_company NOT IN (
+                    SELECT se.id_company
+                    FROM staging.company_emails se,
+                        LATERAL jsonb_array_elements(se.raw_result) AS contact
+                    GROUP BY se.id_company
+                    HAVING COUNT(DISTINCT se.collected_at) >= 1
+                        OR MAX((contact->>'score')::NUMERIC(3,2)) >= 0.8
+                )
+                OR
+                -- Exception : reprend quand même si offre récente très pertinente
+                -- ET aucun email trouvé au-dessus de high_relevance_mail
+                (
+                    EXISTS (
+                        SELECT 1
+                        FROM analytics.job_relevancy jr2
+                        INNER JOIN analytics.job_offer jo2 ON jr2.id_offer = jo2.id_offer
+                        WHERE jo2.id_company = c.id_company
+                        AND jr2.score_relevancy >= %(high_relevance_grade)s
+                        AND COALESCE(jo2.published_at, jo2.collected_at) >= NOW() - INTERVAL '3 days'
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM staging.company_emails se,
+                            LATERAL jsonb_array_elements(se.raw_result) AS contact
+                        WHERE se.id_company = c.id_company
+                        AND (contact->>'score')::NUMERIC(3,2) >= %(high_relevance_mail)s / 10.0
+                    )
+                )
             )
             GROUP BY c.id_company, c.company_name, c.website,
                     cl.id_location, cl.city, cl.country
@@ -101,6 +124,7 @@ def find_mails_dag():
             "cities": config["target_cities"],
             "min_grade": config["min_grade"],
             "limit": config["batch_limit"],
+            "high_relevance_mail": config["high_relevance_mail"],
         }
 
         companies = db.execute(query, params)

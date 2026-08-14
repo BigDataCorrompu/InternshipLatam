@@ -12,9 +12,9 @@ The data ingestion pipeline will be upgraded to improve extraction reliability, 
 | Component | Usage | Monthly Cost |
 |---|---|---|
 | OVH VPS | Airflow orchestration + Docker Compose | $5.35 |
-| LLM enrichment (Silver) | Job offer extraction & scoring | ~$1.00 |
-| LLM dashboard agent | Streamlit conversational agent (variable, usage-based) |  |
-| Email discovery (`find_mails`) | Multi-provider cascade (DDG, grounding) | ~$1.00 |
-| **Total estimated** | | **~$8/month** |
+| LLM enrichment (Silver) | Job offer extraction & scoring | ~$1.50 |
+| LLM dashboard agent | Streamlit conversational agent (variable, usage-based) | ~$0.10 |
+| Email discovery (`find_mails`) | Multi-provider cascade (DDG, grounding) | ~$0.10 |
+| **Total estimated** | | **~$7/month** |
 
 APIs, Streamlit Cloud, Neon PostgreSQL, and Backblaze B2 remain within their respective free tiers at current volume.
