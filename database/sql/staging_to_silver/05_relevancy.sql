@@ -3,7 +3,7 @@ INSERT INTO analytics.job_relevancy
      score_language, score_seniority, score_work_mode, score_company, explanation)
 SELECT
     o.id_offer,
-    (s.raw_result->>'id_prompt')::int,
+    (s.raw_result->>'id_prompt_user_profile')::int,
     (s.raw_result->>'score_relevancy')::float,
     (s.raw_result->'score_details'->>'score_job')::float,
     (s.raw_result->'score_details'->>'score_skills')::float,
