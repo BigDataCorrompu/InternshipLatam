@@ -1,20 +1,11 @@
 {
     "default_params": {
-        "num_pages": 3,
-        "date_posted": "3days",
-        "language": "en"
+        "date_posted": "today",
+        "job_requirements": "under_3_years_experience"
     },
     "queries": [
-        {"query": "data engineer", "location": "Santiago", "country": "cl"},
-        {"query": "junior data engineer llm Santiago", "location": "Santiago", "country": "cl"},
-        {"query": "junior data engineer", "location": "Santiago", "country": "cl"},
-        
-        {"query": "data engineer", "location": "Buenos Aires", "country": "ar"},
-        {"query": "junior data engineer llm Buenos Aires", "location": "Buenos Aires", "country": "ar"},
-        {"query": "junior data engineer", "location": "Buenos Aires", "country": "ar"},
-
-        {"query": "data engineer", "location": "Montevideo", "country": "uy"},
-        {"query": "junior data engineer llm Montevideo", "location": "Montevideo", "country": "uy"},
-        {"query": "junior data engineer", "location": "Montevideo",  "country": "uy"}
+        {"query": "data engineer", "location": "Santiago", "country": "cl", "num_pages": 3},
+        {"query": "data engineer", "location": "Buenos Aires", "country": "ar", "num_pages": 3},
+        {"query": "data engineer", "location": "Montevideo", "country": "uy", "num_pages": 1}
     ]
 }

@@ -271,8 +271,12 @@ class PlacesAPIDetails(PlacesAPI):
         return response.json()
 
     def _map_result_details(self, result: dict) -> dict:
-        components = {c.get("types", [None])[0]: c.get("longText")
-                for c in result.get("addressComponents", [])}
+        components = {}
+        for c in result.get("addressComponents", []):
+            t = (c.get("types") or [None])[0]
+            # country en code ISO (shortText), le reste en nom complet (longText)
+            components[t] = c.get("shortText") if t == "country" else c.get("longText")
+
         return {
             # company 
             "company_primary_type": result.get("types"),
