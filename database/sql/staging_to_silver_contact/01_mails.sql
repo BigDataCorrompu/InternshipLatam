@@ -10,6 +10,7 @@ SELECT DISTINCT ON (email)
 FROM staging.company_emails se,
      jsonb_array_elements(se.raw_result) AS contact
 WHERE contact->>'email' IS NOT NULL
+    AND contact->>'email' ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'
 ORDER BY email, (contact->>'score')::FLOAT DESC, se.collected_at DESC
 ON CONFLICT (email) DO UPDATE
     SET id_company = EXCLUDED.id_company,
