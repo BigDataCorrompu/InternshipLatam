@@ -1,11 +1,13 @@
 {
     "default_params": {
-        "date_posted": "today",
-        "job_requirements": "under_3_years_experience"
+        "date_posted": "today"
     },
     "queries": [
-        {"query": "data engineer", "location": "Santiago", "country": "cl", "num_pages": 3},
-        {"query": "data engineer", "location": "Buenos Aires", "country": "ar", "num_pages": 3},
-        {"query": "data engineer", "location": "Montevideo", "country": "uy", "num_pages": 1}
+        {"query": "data engineer", "location": "Santiago", "country": "cl", "num_pages": 2},
+        {"query": "data engineer", "location": "Buenos Aires", "country": "ar", "num_pages": 2},
+        {"query": "data engineer", "location": "Montevideo", "country": "uy", "num_pages": 1},
+
+        {"query": "junior data engineer", "location": "Santiago", "country": "cl", "num_pages": 1},
+        {"query": "junior data engineer", "location": "Buenos Aires", "country": "ar", "num_pages": 1}
     ]
 }
