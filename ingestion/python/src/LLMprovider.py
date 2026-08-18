@@ -16,11 +16,11 @@ class LLM:
         self._fast = None
         self._mailfinder = None
         self._grounder = None
+        self._application = None
 
     @property
     def enrichement(self):
-        """Modèle utilisé pour tout le pipeline LangGraph d'enrichissement.
-        Un seul endroit à changer pour switcher de provider partout dans le pipeline."""
+        """Model used for langgraph enrichment"""
         if self._enrichement is None:
             self._enrichement = ChatMistralAI(
                 model="ministral-8b-2512", 
@@ -75,3 +75,13 @@ class LLM:
             ).bind_tools([{"google_search": {}}]) 
         return self._grounder   
 
+    @property
+    def application(self):
+        """Model used to generate cover letters and mails"""
+        if self._application is None:
+            self._application = ChatMistralAI(
+                model="mistral-large-2512", 
+                mistral_api_key=self._mistral_key,
+                temperature=0
+            )
+        return self._application

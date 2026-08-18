@@ -1,0 +1,23 @@
+To: jpmorgan.assetmanagement@jpmorgan.com
+Subject: Data Engineering Internship Application — Roland OUCHERIF
+
+------------------------------------------------------------
+
+To whom it may concern,
+
+I am reaching out to express my interest in a Data Engineering internship within your company. I am a dual-degree student in Data Engineering and LLMOps at Polytech Marseille in France and University of Quebec in Canada, currently looking for an internship opportunity.
+
+I’m currently seeking a Data Engineering internship in Buenos Aires, Santiago, or Montevideo—not only to contribute my skills but also to immerse myself in a new culture and accelerate my Spanish learning. When I saw this opportunity with J.P. Morgan in Buenos Aires, it felt like a perfect fit. I wanted to reach out to ask if there might be an internship opening suited to my profile, even if the posted role is at a more experienced level. Given my ongoing work with cloud-based data pipelines and LLM integration, I’m eager to bring my energy and technical foundation to a team that values innovation and scale.
+
+I have attached my CV and a cover letter detailing my background. I would be glad to discuss how my profile could fit your team's needs. Thank you for your time and consideration.
+
+This email, was found and generated automatically through a personal end-to-end pipeline I built, covering ETL, cloud database and bucket storage, LLM-based data transformation, LLM-assisted data visualization, pipeline monitoring, automated contact discovery, and automated email sending. You can learn more about it on the live dashboard: https://internshiplatam.streamlit.app/
+If you have any complaint or you'd rather not receive automated emails like this one, you can request an exclusion here: https://forms.gle/6jQi64GEeQ5rjtq67
+
+Best regards,
+
+Roland OUCHERIF
+
+oucherif.roland@gmail.com
+linkedin.com/in/roland-oucherif
+github.com/BigDataCorrompu
