@@ -7,6 +7,12 @@ data_vis/.streamlit/secrets.toml
 */token.json
 token.json
 
+# ── User Profile ──────────────────────────────────
+candidate_info.yaml
+candidate_skills.yaml
+email_content.yaml
+letter_content.yaml
+config/*.yaml
 
 # ── Python ───────────────────────────────────
 __pycache__/
