@@ -1,4 +1,4 @@
-To: jpmorgan.assetmanagement@jpmorgan.com
+To: (aucun contact trouvé)
 Subject: Data Engineering Internship Application — Roland OUCHERIF
 
 ------------------------------------------------------------
@@ -7,7 +7,7 @@ To whom it may concern,
 
 I am reaching out to express my interest in a Data Engineering internship within your company. I am a dual-degree student in Data Engineering and LLMOps at Polytech Marseille in France and University of Quebec in Canada, currently looking for an internship opportunity.
 
-I’m currently seeking a Data Engineering internship in Buenos Aires, Santiago, or Montevideo—not only to contribute my skills but also to immerse myself in a new culture and accelerate my Spanish learning. When I saw this opportunity with J.P. Morgan in Buenos Aires, it felt like a perfect fit. I wanted to reach out to ask if there might be an internship opening suited to my profile, even if the posted role is at a more experienced level. Given my ongoing work with cloud-based data pipelines and LLM integration, I’m eager to bring my energy and technical foundation to a team that values innovation and scale.
+I came across the Bank Support Worker position at Maes-y-Wennol Care Home and wanted to reach out to explore whether there might be an opportunity for a Data Engineering internship within your organization. While my background is rooted in building production-grade ELT pipelines, LLM workflows, and cloud-based data systems, I’m particularly drawn to the possibility of contributing to a team in Wales, even in a different capacity, to gain new perspectives and experiences. This would also allow me to improve my English in a professional setting, as I continue working toward fluency. I’d love to learn if there’s a way my skills could align with your needs, even if outside the scope of this specific role.
 
 I have attached my CV and a cover letter detailing my background. I would be glad to discuss how my profile could fit your team's needs. Thank you for your time and consideration.
 

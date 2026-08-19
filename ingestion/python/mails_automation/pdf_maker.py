@@ -32,8 +32,8 @@ html_template = Template("""
 <style>
     body {
         font-family: 'Helvetica', sans-serif;
-        font-size: 11pt;
-        line-height: 1.5;
+        font-size: 10.5pt;
+        line-height: 1.25;
         color: #1a1a1a;
     }
     /* Barre bleue tout en haut du document, pleine largeur */

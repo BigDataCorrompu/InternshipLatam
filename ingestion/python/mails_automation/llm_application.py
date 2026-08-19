@@ -32,7 +32,7 @@ import yaml
 from pydantic import BaseModel, Field
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage
-
+import re
 
 # ---------------------------------------------------------------------------
 # Schéma de sortie structuré
@@ -56,10 +56,13 @@ class GeneratedContent(BaseModel):
     greeting_line: str = Field(
         ...,
         description=(
-            "The salutation line. If a named contact is provided in the job "
-            "context, format it naturally (e.g. 'Dear Mr. Pratt,' or "
-            "'Dear Al Pratt,' depending on what fits best). If no contact "
-            "name is provided, use the given default greeting unchanged."
+            "The salutation line. Look at job_context['contact_explanation'] and job_context['contact_email']  — "
+            "if it contains an identifiable person's name in any format, "
+            "extract that name and format it naturally as a greeting (e.g. "
+            "'Dear Ms. Langenus,' or 'Dear Anna Langenus,'). If no name can be "
+            "Langenus,' or 'Dear Anna Langenus,').  "
+            "If no name can be reliably identified, use the given default greeting "
+            "unchanged — do not guess or invent a name."
         ),
     )
     paragraphs: list[GeneratedParagraph] = Field(
@@ -87,17 +90,38 @@ Rules:
   to avoid repeating the same ideas, facts, or phrasing across paragraphs —
   each paragraph must add something new and distinct.
 - Write in English.
+- Keep each paragraph concise: 3 to 5 sentences maximum. The full letter
+  must fit on a single page — favor precision over exhaustiveness.
+- CRITICAL: output PLAIN TEXT ONLY. Never use markdown formatting of any
+  kind — no asterisks for bold or italics (**word** or *word*), no
+  underscores, no bullet points, no headers, no backticks. Company names,
+  job titles, cities, and skills must appear as normal plain text, never
+  emphasized or highlighted. This text will be inserted directly into an
+  email or a PDF document — any markdown syntax will appear as literal
+  stray characters to the reader.
+- Never use em dashes (—) or en dashes with spaces as punctuation. Use
+  commas, periods, or parentheses instead.
 - Follow the JSON output schema exactly: one greeting line, and one
   paragraph per numbered instruction, in the same order.
-- Never use em dashes (—) or en dashes with spaces as punctuation. Use
-  commas, periods, or parentheses instead — this is a strong stylistic
-  signal of AI-generated text and must be avoided entirely.  
+- Write like a human would: natural, varied sentence rhythm, no robotic or
+  overly polished corporate tone.
   """
 
 
 # ---------------------------------------------------------------------------
 # Appel unique : génère le greeting + tous les paragraphes LLM d'un document
 # ---------------------------------------------------------------------------
+
+def clean_llm_text(text: str) -> str:
+    """Nettoie les artefacts stylistiques typiques des LLM (filet de sécurité,
+    en complément des consignes du SYSTEM_PROMPT)."""
+    # Em dash (—) et en dash (–) avec espaces -> virgule
+    text = re.sub(r'\s*[—–]\s*', ', ', text)
+    # Markdown gras/italique -> texte brut
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.+?)\*', r'\1', text)
+    return text
+
 
 def generate_document_content(
     static_paragraphs: list[str],
@@ -156,6 +180,10 @@ Paragraphs to write ({len(llm_instructions)} total, in this exact order):
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=user_prompt),
     ])
+
+    result.greeting_line = clean_llm_text(result.greeting_line)
+    for p in result.paragraphs:
+        p.text = clean_llm_text(p.text)
 
     if len(result.paragraphs) != len(llm_instructions):
         raise ValueError(

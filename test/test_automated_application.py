@@ -106,7 +106,11 @@ def fetch_sample_job_posting() -> dict:
             jr.skills_aptitudes,
             jr.skills_soft,
 
-            cc.email AS contact_email
+            jrel.score_relevancy,
+            jrel.explanation AS relevancy_explanation,
+
+            cc.email AS contact_email,
+            cc.explanation AS contact_explanation
 
         FROM analytics.job_offer jo
         JOIN analytics.company c
@@ -115,6 +119,8 @@ def fetch_sample_job_posting() -> dict:
             ON jo.id_location = cl.id_location
         LEFT JOIN analytics.job_requirement jr
             ON jr.id_offer = jo.id_offer
+        LEFT JOIN analytics.job_relevancy jrel
+            ON jrel.id_offer = jo.id_offer
         LEFT JOIN analytics.company_contact cc
             ON cc.id_company = c.id_company
            AND (cc.id_location = cl.id_location OR cc.id_location IS NULL)
@@ -154,11 +160,15 @@ def fetch_sample_job_posting() -> dict:
         "skills_frameworks": row.get("skills_frameworks") or [],
         "skills_aptitudes": row.get("skills_aptitudes") or [],
         "skills_soft": row.get("skills_soft") or [],
-        
+
         # Pas de nom de contact en base (seulement email) -> greeting générique
-        "contact_name": None,
-        "contact_title": None,
+        "relevancy_score": row.get("score_relevancy"),
+        "relevancy_explanation": row.get("relevancy_explanation") or None,
+
+
+
         "contact_email": row.get("contact_email") or None,
+        "contact_explanation": row.get("contact_explanation") or None,
     }
 
 
