@@ -56,13 +56,14 @@ class GeneratedContent(BaseModel):
     greeting_line: str = Field(
         ...,
         description=(
-            "The salutation line. Look at job_context['contact_explanation'] and job_context['contact_email']  — "
-            "if it contains an identifiable person's name in any format, "
-            "extract that name and format it naturally as a greeting (e.g. "
-            "'Dear Ms. Langenus,' or 'Dear Anna Langenus,'). If no name can be "
-            "Langenus,' or 'Dear Anna Langenus,').  "
-            "If no name can be reliably identified, use the given default greeting "
-            "unchanged — do not guess or invent a name."
+            "The salutation line. Look at job_context['contact_explanation'] and "
+            "job_context['contact_email'] — if either contains an identifiable "
+            "person's name, use it in the greeting as full name (e.g. 'Dear Anna "
+            "Langenus,'). Only use a title like 'Mr.' or 'Ms.' if the gender is "
+            "explicitly stated in the given context (e.g. a title already present "
+            "in contact_explanation) — never infer gender from a first name alone, "
+            "as this risks being wrong. If no name can be reliably identified, use "
+            "the given default greeting unchanged — do not guess or invent a name."
         ),
     )
     paragraphs: list[GeneratedParagraph] = Field(

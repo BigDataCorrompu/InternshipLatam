@@ -1,6 +1,6 @@
 {
     "default_params": {
-        "date_posted": "today"
+        "date_posted": "3days"
     },
     "queries": [
         {"query": "data engineer", "location": "Santiago", "country": "cl", "num_pages": 2},

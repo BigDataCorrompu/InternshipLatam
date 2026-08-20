@@ -171,14 +171,104 @@ def fetch_sample_job_posting() -> dict:
         "contact_explanation": row.get("contact_explanation") or None,
     }
 
+def fetch_latest_job_posting_with_top_email() -> dict:
+    """
+    Récupère la dernière offre (par date) dont le score de relevancy est
+    strictement supérieur à 9 ET qui a un email de contact associé.
+    Même structure que fetch_sample_job_posting.
+    """
+    query = """
+        SELECT
+            jo.id_offer,
+            jo.job_title,
+            jo.offer_description,
+            jo.contract_type,
+            jo.is_remote,
+            jo.published_at,
+            jo.collected_at,
 
+            c.company_name,
+
+            cl.city,
+            cl.country,
+
+            jr.alternative_job_titles,
+            jr.offer_languages,
+            jr.seniority,
+            jr.skills_languages,
+            jr.skills_frameworks,
+            jr.skills_aptitudes,
+            jr.skills_soft,
+
+            jrel.score_relevancy,
+            jrel.explanation AS relevancy_explanation,
+
+            cc.email AS contact_email,
+            cc.explanation AS contact_explanation
+
+        FROM analytics.job_offer jo
+        JOIN analytics.company c
+            ON jo.id_company = c.id_company
+        LEFT JOIN analytics.company_location cl
+            ON jo.id_location = cl.id_location
+        LEFT JOIN analytics.job_requirement jr
+            ON jr.id_offer = jo.id_offer
+        JOIN analytics.job_relevancy jrel
+            ON jrel.id_offer = jo.id_offer
+        JOIN analytics.company_contact cc
+            ON cc.id_company = c.id_company
+           AND (cc.id_location = cl.id_location OR cc.id_location IS NULL)
+
+        WHERE c.company_name IS NOT NULL
+          AND cl.city IS NOT NULL
+          AND cc.email IS NOT NULL
+          AND jrel.score_relevancy > 9
+
+        ORDER BY COALESCE(jo.published_at, jo.collected_at) DESC
+        LIMIT 1;
+    """
+
+    with psycopg2.connect(DATABASE_URL) as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(query)
+            row = cur.fetchone()
+
+    if row is None:
+        raise RuntimeError("Aucune offre avec score > 9 et email trouvée en base.")
+
+    return {
+        "offer_id": row["id_offer"],
+        "job_title": row["job_title"],
+        "offer_description": row.get("offer_description") or "",
+        "contract_type": row.get("contract_type") or "unspecified",
+        "is_remote": bool(row.get("is_remote")),
+
+        "company_name": row["company_name"],
+
+        "city": row["city"],
+        "country": row.get("country") or "unknown",
+
+        "related_job_titles": row.get("alternative_job_titles") or [],
+        "offer_languages": row.get("offer_languages") or [],
+        "seniority": row.get("seniority") or "unspecified",
+        "skills_languages": row.get("skills_languages") or [],
+        "skills_frameworks": row.get("skills_frameworks") or [],
+        "skills_aptitudes": row.get("skills_aptitudes") or [],
+        "skills_soft": row.get("skills_soft") or [],
+
+        "relevancy_score": row.get("score_relevancy"),
+        "relevancy_explanation": row.get("relevancy_explanation") or None,
+
+        "contact_email": row.get("contact_email") or None,
+        "contact_explanation": row.get("contact_explanation") or None,
+    }
 # ---------------------------------------------------------------------------
 # Exécution du test
 # ---------------------------------------------------------------------------
 
 def main():
     print("→ Récupération d'une offre depuis la base...")
-    job_context = fetch_sample_job_posting()
+    job_context = fetch_latest_job_posting_with_top_email()
     print(f"   Offre : {job_context['company_name']} — {job_context['job_title']}")
     print(f"   Lieu  : {job_context['city']}, {job_context['country']}")
     print(f"   Contact email : {job_context['contact_email'] or '(aucun)'}")
