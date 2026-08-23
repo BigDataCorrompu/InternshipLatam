@@ -1,3 +1,6 @@
+Généré le : 2026-08-22 22:18:51
+Offre     : Google — Genai Forward-Deployed Engineer Ii | Enterprise Ai Solutions
+id_offer  : cj_fa1fe4abef9aed6da5fd1e8e3ec928ae
 To: lucy@reston.org
 Subject: Data Engineering Internship Application — Roland OUCHERIF
 
@@ -7,7 +10,7 @@ Dear Lucy Renault,
 
 Full disclosure: this application was generated automatically through a personal end-to-end pipeline I built, covering ETL, cloud storage, LLM-based data transformation and visualization, and automated contact discovery and sending. I am reaching out to express my interest in a Data Engineering internship within your company, ideally starting between late 2026 and early 2027. I am a dual-degree student specialized in Data Engineering and LLMOps at Polytech Marseille in France and the University of Quebec in Canada. You can learn more about the pipeline behind this email on the live dashboard: https://internshiplatam.streamlit.app/
 
-I came across the GenAI Forward-Deployed Engineer II role based in Buenos Aires, and I wanted to reach out to you directly to explore whether Google might consider offering an internship opportunity in Data Engineering for someone with my profile. Buenos Aires is a city I’ve been eager to experience, both for its vibrant culture and as a chance to immerse myself in a Spanish-speaking environment, a great fit for my elementary proficiency and enthusiasm for learning the language. While the posted role is more senior than my current level, I’m confident that my hands-on experience building production-grade ELT pipelines and integrating LLM workflows could translate well into a supportive internship setting. I’d love to hear your thoughts on whether this might be a possibility or if there’s someone else on your team I could connect with.
+I came across the GenAI Forward-Deployed Engineer II opportunity at Google in Buenos Aires, and I wanted to reach out to you directly to explore whether there might be a fit for a Data Engineering internship within your team. Buenos Aires is at the top of my list for places to grow my skills while immersing myself in a new culture, and I’d love the chance to contribute to projects that bridge AI and production-grade data systems. My hands-on experience building ELT pipelines with Airflow, Docker, and cloud infrastructure aligns closely with the technical challenges your team tackles, and I’m eager to learn how I could support your goals while gaining exposure to Google Cloud’s AI ecosystem. Given my foundational Spanish skills, this would also be a great opportunity to improve my proficiency in a professional setting.
 
 I have attached my CV and a cover letter detailing my background. I would be glad to discuss how my profile could fit your team's needs. Thank you for your time and consideration.
 

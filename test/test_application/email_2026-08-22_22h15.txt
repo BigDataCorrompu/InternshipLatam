@@ -1,3 +1,6 @@
+Généré le : 2026-08-22 22:15:35
+Offre     : Google — Genai Forward-Deployed Engineer Ii | Enterprise Ai Solutions
+id_offer  : cj_fa1fe4abef9aed6da5fd1e8e3ec928ae
 To: lucy@reston.org
 Subject: Data Engineering Internship Application — Roland OUCHERIF
 
@@ -7,7 +10,7 @@ Dear Lucy Renault,
 
 Full disclosure: this application was generated automatically through a personal end-to-end pipeline I built, covering ETL, cloud storage, LLM-based data transformation and visualization, and automated contact discovery and sending. I am reaching out to express my interest in a Data Engineering internship within your company, ideally starting between late 2026 and early 2027. I am a dual-degree student specialized in Data Engineering and LLMOps at Polytech Marseille in France and the University of Quebec in Canada. You can learn more about the pipeline behind this email on the live dashboard: https://internshiplatam.streamlit.app/
 
-I came across the GenAI Forward-Deployed Engineer II role based in Buenos Aires, and I wanted to reach out to you directly to explore whether Google might consider offering an internship opportunity in Data Engineering for someone with my profile. Buenos Aires is a city I’ve been eager to experience, both for its vibrant culture and as a chance to immerse myself in a Spanish-speaking environment, a great fit for my elementary proficiency and enthusiasm for learning the language. While the posted role is more senior than my current level, I’m confident that my hands-on experience building production-grade ELT pipelines and integrating LLM workflows could translate well into a supportive internship setting. I’d love to hear your thoughts on whether this might be a possibility or if there’s someone else on your team I could connect with.
+I came across the GenAI Forward-Deployed Engineer II role based in Buenos Aires, and I wanted to reach out to you directly to explore whether Google might consider offering an internship opportunity tailored to a Data Engineering profile like mine. Buenos Aires is a city I’ve been eager to experience, both for its vibrant culture and as a chance to immerse myself in a Spanish-speaking environment, a great fit for my language goals. Given my focus on building production-grade ELT pipelines and LLM workflows, I’m particularly excited about the possibility of contributing to Google Cloud’s AI initiatives while learning from teams at the forefront of enterprise AI solutions. I’d love to hear your thoughts on whether there might be a place for an intern to support your work, even if the current posting isn’t an exact match for my experience level.
 
 I have attached my CV and a cover letter detailing my background. I would be glad to discuss how my profile could fit your team's needs. Thank you for your time and consideration.
 
