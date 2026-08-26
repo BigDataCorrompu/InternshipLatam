@@ -33,7 +33,7 @@ Notebook_test/test_graph/*
 # ── Data ─────────────────────────────────────
 ingestion/python/results/
 ingestion/raw/          
-
+test/test_application/
 
 # ── Docker ───────────────────────────────────
 docker-compose.override.yml
