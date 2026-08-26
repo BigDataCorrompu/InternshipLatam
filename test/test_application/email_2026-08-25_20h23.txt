@@ -1,0 +1,25 @@
+Généré le : 2026-08-25 20:23:41
+Offre     : EY — Ttt - Data Engineer - Ey Global Delivery Services (Buenos Aires)
+id_offer  : cj_55535eff78699eb184020ae4393e6325
+To: sumon.sengupta@ey.com
+Subject: Data Engineering Internship Application — Roland OUCHERIF
+
+------------------------------------------------------------
+
+Dear Sumon Sengupta,
+
+Full disclosure: this application was generated automatically through a personal end-to-end pipeline I built, covering ETL, cloud storage, LLM-based data transformation and visualization, and automated contact discovery and sending. I am reaching out to express my interest in a Data Engineering internship within your company, ideally starting between late 2026 and early 2027. I am a dual-degree student specialized in Data Engineering and LLMOps at Polytech Marseille in France and the University of Quebec in Canada. You can learn more about the pipeline behind this email on the live dashboard: https://internshiplatam.streamlit.app/
+
+I came across the Ttt - Data Engineer role at EY Global Delivery Services in Buenos Aires and wanted to reach out personally to explore whether an internship opportunity might exist for someone with my profile. Buenos Aires is at the top of my list for an internship, as I’m eager to immerse myself in a new culture while contributing to impactful data engineering work. My experience building production-grade ELT pipelines, working with cloud infrastructure, and integrating LLM workflows aligns closely with the kind of projects your team handles. I’d love the chance to discuss how I could support your goals while growing my skills in a dynamic environment like yours. Given my elementary Spanish, this would also be a great opportunity to learn and adapt.
+
+I have attached my CV and a cover letter detailing my background. I would be glad to discuss how my profile could fit your team's needs. Thank you for your time and consideration.
+
+If you have any complaint or you'd rather not receive automated emails like this one, you can request an exclusion here: https://forms.gle/6jQi64GEeQ5rjtq67
+
+Best regards,
+
+Roland OUCHERIF
+
+oucherif.roland@gmail.com
+linkedin.com/in/roland-oucherif
+github.com/BigDataCorrompu

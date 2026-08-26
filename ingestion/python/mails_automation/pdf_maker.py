@@ -18,7 +18,7 @@ Utilisation :
 import yaml
 from jinja2 import Template
 from xhtml2pdf import pisa
-
+from pypdf import PdfReader
 # ---------------------------------------------------------------------------
 # Template HTML/CSS — mise en page fixe, un seul endroit à ajuster le style
 # Note : xhtml2pdf supporte un sous-ensemble de CSS (moins complet que
@@ -32,8 +32,8 @@ html_template = Template("""
 <style>
     body {
         font-family: 'Helvetica', sans-serif;
-        font-size: 10.5pt;
-        line-height: 1.25;
+        font-size: {{ body_font_size }}pt;
+        line-height: {{ body_line_height }};
         color: #1a1a1a;
     }
     /* Barre bleue tout en haut du document, pleine largeur */
@@ -172,13 +172,16 @@ html_template = Template("""
 def load_yaml(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
- 
- 
-def render_pdf(context: dict, output_path: str = "cover_letter.pdf"):
+
+def count_pdf_pages(path: str) -> int:
+    reader = PdfReader(path)
+    return len(reader.pages)
+
+def render_pdf_raw(context: dict, output_path: str) -> None:
     """
-    Rend le PDF à partir d'un contexte déjà résolu.
-    context['body_paragraphs'] doit être une liste de chaînes (str) —
-    aucun dict "llm" ne doit subsister à ce stade.
+    Rendu PDF brut, sans logique de réduction de page. context doit déjà
+    contenir body_font_size et body_line_height. Ne fait qu'un rendu, ne
+    vérifie rien — c'est render_pdf() qui orchestre la boucle de réduction.
     """
     html_content = html_template.render(**context)
  
@@ -188,8 +191,45 @@ def render_pdf(context: dict, output_path: str = "cover_letter.pdf"):
     if result.err:
         raise RuntimeError(f"Erreur lors de la génération du PDF ({result.err} erreur(s))")
  
-    print(f"✅ PDF généré : {output_path}")
  
+def render_pdf(
+    context: dict,
+    output_path: str = "cover_letter.pdf",
+    font_sizes: list[tuple[float, float]] = None,
+) -> str:
+    """
+    Rend le PDF en essayant des tailles de police décroissantes jusqu'à
+    tenir sur une page. font_sizes est une liste de (font_size, line_height)
+    du plus grand au plus petit — s'arrête au premier qui tient, ou garde
+    le dernier essai (le plus petit) si aucun ne suffit.
+    """
+    if font_sizes is None:
+        font_sizes = [
+            (11, 1.5),
+            (10.5, 1.45),
+            (10, 1.4),
+            (9.5, 1.35),
+        ]
+ 
+    for font_size, line_height in font_sizes:
+        render_context = {
+            **context,
+            "body_font_size": font_size,
+            "body_line_height": line_height,
+        }
+        render_pdf_raw(render_context, output_path)
+ 
+        page_count = count_pdf_pages(output_path)
+        if page_count <= 1:
+            print(f"✅ PDF généré : {output_path} ({font_size}pt, 1 page)")
+            return output_path
+ 
+    print(
+        f"⚠️ PDF généré : {output_path} — ne tient toujours pas sur une page "
+        f"même à {font_sizes[-1][0]}pt. Contenu probablement trop long, "
+        f"raccourcir un paragraphe."
+    )
+    return output_path
  
 if __name__ == "__main__":
     # Test rapide sans résolution LLM : les paragraphes {"llm": ...} restants

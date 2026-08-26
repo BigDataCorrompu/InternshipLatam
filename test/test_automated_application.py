@@ -184,6 +184,8 @@ BEST_QUERY = """
           AND cl.city IS NOT NULL
           AND cc.email IS NOT NULL
           AND cc.source = 'hunter'
+          AND jrel.score_relevancy > 7
+          AND jo.id_offer != 'cj_7f18aaf8cdf33585886b927e97dc7092'
 
 
         ORDER BY COALESCE(jo.published_at, jo.collected_at) DESC

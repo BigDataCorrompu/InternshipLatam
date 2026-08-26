@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage
 import re
-
+from tenacity import retry, stop_after_attempt
 # ---------------------------------------------------------------------------
 # Schéma de sortie structuré
 # ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ def clean_llm_text(text: str) -> str:
     text = re.sub(r'\*(.+?)\*', r'\1', text)
     return text
 
-
+@retry(stop=stop_after_attempt(3))
 def generate_document_content(
     static_paragraphs: list[str],
     llm_instructions: list[str],
