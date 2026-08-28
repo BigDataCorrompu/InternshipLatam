@@ -252,14 +252,22 @@ class Extract:
                             If no information is available, do not invent one: return null for single value fields, and an empty list [] for array/list fields.
                         """
         # Structure the mission of the LLM with precision
-        system = SystemMessage(
-            content=system_content,
-            additional_kwargs={"cache_control": {"type": "ephemeral"}}
-            )
+        system = SystemMessage(content=system_content)
         user = HumanMessage(content=context)
 
+        # Configuration spécifique à Mistral pour activer le Prompt Caching
+        # On regroupe le cache par tâche (task) car le prompt système reste identique pour cette tâche
+        config = {
+            "extra_body": {
+                "prompt_cache_key": f"extract_task_{self._output_key}"
+            }
+        }
+
         try:
-            response = call_with_retry(lambda: self._llm_structured.invoke([system, user]))
+            # On passe la configuration contenant la clé de cache à l'invocation
+            response = call_with_retry(
+                lambda: self._llm_structured.invoke([system, user], config=config)
+            )
             data = response.model_dump()
             if len(data) == 1:
                 return {self._output_key: next(iter(data.values()))}

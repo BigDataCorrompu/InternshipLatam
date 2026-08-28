@@ -11,6 +11,19 @@ Pourquoi un seul appel plutôt qu'un par paragraphe :
       entre offres, seul job_context change).
     - Moins d'appels API = moins de latence et de coût.
 
+Prompt caching (Mistral) :
+    Contrairement à Anthropic (cache_control: {"type": "ephemeral"}), Mistral
+    utilise un paramètre `prompt_cache_key` au niveau de la requête — un
+    identifiant stable côté application, pas un marqueur sur un bloc précis
+    du prompt. Mistral tente de réutiliser le préfixe commun entre requêtes
+    partageant la même clé.
+    Ici, la clé est construite par TYPE DE DOCUMENT ("application_email" /
+    "application_letter"), car pour un type donné, le début du prompt
+    (skills + instructions numérotées, qui sont fixes dans le YAML) reste
+    identique d'une offre à l'autre — seul job_context change en fin de
+    prompt. C'est cette portion stable en tête qui peut être servie depuis
+    le cache.
+
 Le modèle est passé en paramètre comme une INSTANCE LangChain déjà
 configurée (ex: LLM().smart), pas un nom de modèle en string.
 
@@ -24,16 +37,18 @@ Le schéma de sortie (GeneratedContent) utilise une LISTE de paragraphes
 librement dans le YAML sans jamais devoir modifier ce fichier.
 
 Dépendances (à ajouter dans requirements-airflow.txt) :
-    pyyaml, pydantic, + le package langchain du provider utilisé
+    pyyaml, pydantic, tenacity, + le package langchain du provider utilisé
     (ex: langchain-mistralai)
 """
 
+import re
 import yaml
 from pydantic import BaseModel, Field
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import SystemMessage, HumanMessage
-import re
 from tenacity import retry, stop_after_attempt
+
+
 # ---------------------------------------------------------------------------
 # Schéma de sortie structuré
 # ---------------------------------------------------------------------------
@@ -82,8 +97,8 @@ application (email or cover letter), written on behalf of a candidate seeking
 a Data Engineering internship.
 
 Rules:
-- Write like a human would: natural, warm but professional, varied sentence
-  structure. Avoid generic, robotic, or overly formal corporate phrasing.
+- Write like a human would: natural, varied sentence rhythm, no robotic or
+  overly polished corporate tone.
 - Never invent facts about the candidate or the company beyond what is given
   in the context below.
 - You are given the FULL set of paragraphs to write for this document at
@@ -104,24 +119,25 @@ Rules:
   commas, periods, or parentheses instead.
 - Follow the JSON output schema exactly: one greeting line, and one
   paragraph per numbered instruction, in the same order.
-- Write like a human would: natural, varied sentence rhythm, no robotic or
-  overly polished corporate tone.
-  """
+"""
 
 
 # ---------------------------------------------------------------------------
-# Appel unique : génère le greeting + tous les paragraphes LLM d'un document
+# Nettoyage post-génération (filet de sécurité)
 # ---------------------------------------------------------------------------
 
 def clean_llm_text(text: str) -> str:
     """Nettoie les artefacts stylistiques typiques des LLM (filet de sécurité,
     en complément des consignes du SYSTEM_PROMPT)."""
-    # Em dash (—) et en dash (–) avec espaces -> virgule
-    text = re.sub(r'\s*[—–]\s*', ', ', text)
-    # Markdown gras/italique -> texte brut
-    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.+?)\*', r'\1', text)
+    text = re.sub(r'\s*[—–]\s*', ', ', text)          # em/en dash -> virgule
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)       # **gras** -> texte
+    text = re.sub(r'\*(.+?)\*', r'\1', text)           # *italique* -> texte
     return text
+
+
+# ---------------------------------------------------------------------------
+# Appel unique : génère le greeting + tous les paragraphes LLM d'un document
+# ---------------------------------------------------------------------------
 
 @retry(stop=stop_after_attempt(3))
 def generate_document_content(
@@ -131,6 +147,7 @@ def generate_document_content(
     skills: dict,
     job_context: dict,
     model: BaseChatModel,
+    document_type: str = "application",
 ) -> GeneratedContent:
     """
     Un seul appel LLM pour tout le document (email ou lettre).
@@ -144,6 +161,11 @@ def generate_document_content(
         skills: contenu de candidate_skills.yaml.
         job_context: contexte de l'offre ciblée (contact_name, company_name, city, etc.).
         model: instance LangChain déjà configurée, ex: LLM().smart.
+        document_type: identifie le type de document ("email" ou "letter") —
+            sert de base à la clé de cache Mistral (prompt_cache_key), pour
+            que toutes les offres traitées pour un même type de document
+            partagent le même préfixe cacheable (skills + instructions,
+            qui sont fixes dans le YAML pour ce type de document).
 
     Returns:
         GeneratedContent(greeting_line=..., paragraphs=[...])
@@ -177,10 +199,26 @@ Paragraphs to write ({len(llm_instructions)} total, in this exact order):
 {numbered_instructions}
 """
 
-    result = structured_model.invoke([
-        SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=user_prompt),
-    ])
+    # Clé de cache Mistral : stable par type de document, pas par offre.
+    # Le préfixe partagé (system prompt + skills + instructions, qui sont
+    # identiques d'une offre à l'autre pour un même type de document) peut
+    # ainsi être servi depuis le cache ; seul job_context varie en fin de
+    # prompt et n'affecte pas le hit sur le préfixe.
+    prompt_cache_key = f"application_{document_type}"
+
+    config = {
+        "extra_body": {
+            "prompt_cache_key": prompt_cache_key,
+        }
+    }
+
+    result = structured_model.invoke(
+        [
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=user_prompt),
+        ],
+        config=config,
+    )
 
     result.greeting_line = clean_llm_text(result.greeting_line)
     for p in result.paragraphs:
@@ -199,12 +237,14 @@ Paragraphs to write ({len(llm_instructions)} total, in this exact order):
 # Résolution complète d'un document : sépare statique/LLM, appelle le LLM
 # une fois, réinjecte les paragraphes générés à leur position d'origine.
 # ---------------------------------------------------------------------------
+
 def resolve_document(
     body_paragraphs: list,
     default_greeting: str,
     skills: dict,
     job_context: dict,
     model: BaseChatModel,
+    document_type: str = "application",
 ) -> dict:
     """
     Résout un document entier (email_content ou letter_content) en un seul
@@ -213,6 +253,8 @@ def resolve_document(
     Args:
         body_paragraphs: liste brute du YAML (str ou {"llm": "..."})
         default_greeting: valeur de greeting_line dans le YAML
+        document_type: "email" ou "letter" — utilisé pour la clé de cache
+            Mistral (voir generate_document_content).
 
     Returns:
         {
@@ -237,6 +279,7 @@ def resolve_document(
         skills=skills,
         job_context=job_context,
         model=model,
+        document_type=document_type,
     )
 
     # Vérifie qu'on a bien exactement un paragraphe par instruction, sans
@@ -273,12 +316,13 @@ def resolve_document(
         "body_paragraphs": resolved,
     }
 
+
 # ---------------------------------------------------------------------------
 # Test rapide et indépendant.
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    from llm_provider import LLM  # ta classe à rôles existante
+    from LLMprovider import LLM  # ta classe à rôles existante
 
     MODEL = LLM().smart  # change ici: LLM().fast, LLM().enrichement, etc.
 
@@ -319,6 +363,7 @@ if __name__ == "__main__":
             skills=skills,
             job_context=job_context,
             model=MODEL,
+            document_type="letter",
         )
 
         print("greeting_line:", result["greeting_line"])
