@@ -13,6 +13,8 @@ candidate_skills.yaml
 email_content.yaml
 letter_content.yaml
 config/*.yaml
+config/*.pdf
+
 
 # ── Python ───────────────────────────────────
 __pycache__/
