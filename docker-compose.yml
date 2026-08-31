@@ -90,6 +90,7 @@ services:
       # LLM __________________________________________________
       AIRFLOW_VAR_MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       AIRFLOW_VAR_GEMINI_API_KEY: ${GEMINI_API_KEY}
+      AIRFLOW_VAR_MAIL_TEST: ${MAIL_TEST}
       
     volumes:
       - ./ingestion/airflow/dags:/opt/airflow/dags
