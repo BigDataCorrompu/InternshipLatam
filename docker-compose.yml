@@ -63,7 +63,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__PARALLELISM: 4
       AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 4
-      PYTHONPATH: /opt/airflow/pipeline:/opt/airflow/agent:/opt/airflow/dags
+      PYTHONPATH: /opt/airflow/pipeline:/opt/airflow/agent:/opt/airflow/mails_automation:/opt/airflow/dags
       AIRFLOW_VAR_RAW_DATA_PATH: ${RAW_DATA_PATH}
       # Variables Airflow auto-créées
       # Neon _________________________________________________
@@ -90,8 +90,7 @@ services:
       # LLM __________________________________________________
       AIRFLOW_VAR_MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       AIRFLOW_VAR_GEMINI_API_KEY: ${GEMINI_API_KEY}
-      AIRFLOW_VAR_MAIL_TEST: ${MAIL_TEST}
-      
+      AIRFLOW_VAR_MAIL_TEST: ${MAIL_TEST} 
     volumes:
       - ./ingestion/airflow/dags:/opt/airflow/dags
       - ./ingestion/python/src:/opt/airflow/pipeline
@@ -118,7 +117,7 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      PYTHONPATH: /opt/airflow/pipeline:/opt/airflow/agent:/opt/airflow/mails_automation:/opt/airflow/dags
+      PYTHONPATH: /opt/airflow/pipeline   # ← pointe vers python/src/
     volumes:
       - ./ingestion/airflow/dags:/opt/airflow/dags       # ← DAGs
       - ./ingestion/python/src:/opt/airflow/pipeline     # ← scripts Python
