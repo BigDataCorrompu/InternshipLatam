@@ -96,6 +96,7 @@ services:
       - ./ingestion/airflow/dags:/opt/airflow/dags
       - ./ingestion/python/src:/opt/airflow/pipeline
       - ./ingestion/python/enrichment_agent:/opt/airflow/agent
+      - ./ingestion/python/mails_automation:/opt/airflow/mails_automation
       - ./database/sql/staging_to_silver:/opt/airflow/pipeline/sql/staging_to_silver/
       - ./database/sql/staging_to_silver_contact:/opt/airflow/pipeline/sql/staging_to_silver_contact/
       - ./ingestion/logs:/opt/airflow/logs
@@ -117,7 +118,7 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      PYTHONPATH: /opt/airflow/pipeline   # ← pointe vers python/src/
+      PYTHONPATH: /opt/airflow/pipeline:/opt/airflow/agent:/opt/airflow/mails_automation:/opt/airflow/dags
     volumes:
       - ./ingestion/airflow/dags:/opt/airflow/dags       # ← DAGs
       - ./ingestion/python/src:/opt/airflow/pipeline     # ← scripts Python
