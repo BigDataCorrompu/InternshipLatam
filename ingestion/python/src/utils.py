@@ -7,6 +7,8 @@ from bucket import Bucket
 import langdetect
 logger = logging.getLogger(__name__)
 import re
+import time
+import os
 # JSearch : "Montevideo, Departamento de Montevideo • a través de Jooble"
 # Le séparateur "•" isole toujours la partie utile, quelle que soit la langue
 # du suffixe ("a través de", "through", "via"...).
@@ -253,3 +255,20 @@ def clean_location_raw(location_raw: str, api_source: str = None) -> str | None:
 
     cleaned = cleaned.strip(" ,-")
     return cleaned or None
+
+
+
+def cleanup_stale_files(directory: str, max_age_hours: int = 48):
+    """Supprime les fichiers plus vieux que max_age_hours, filet de sécurité
+    indépendant du succès/échec du pipeline principal."""
+    if not os.path.isdir(directory):
+        return
+
+    now = time.time()
+    for filename in os.listdir(directory):
+        filepath = os.path.join(directory, filename)
+        if os.path.isfile(filepath):
+            age_hours = (now - os.path.getmtime(filepath)) / 3600
+            if age_hours > max_age_hours:
+                os.remove(filepath)
+                print(f"→ Supprimé (trop ancien, {age_hours:.0f}h): {filename}")
