@@ -254,7 +254,7 @@ def automated_application():
             Liste des chemins de fichiers JSON générés (ou déjà existants).
         """
         from llm_application import resolve_document
-        from LLMProvider import LLM
+        from LLMprovider import LLM
         from pdf_maker import load_yaml
 
         APPLICATIONS_PATH.mkdir(parents=True, exist_ok=True)
