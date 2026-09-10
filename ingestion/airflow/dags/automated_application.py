@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # ___ CONSTANTS _______________________________________________________________
 APPLICATIONS_PATH = Path(os.getenv('APPLICATIONS_DATA_PATH', '/opt/airflow/applications'))
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/opt/airflow/config"))
+TOKEN_FILE = str(CONFIG_PATH / "token.json")
 
 SCHEDULE = "0 8 * * *"
 
@@ -27,23 +28,30 @@ DATA_TYPE = "job_application"
 LABEL_NAME = "automation_mail"
 
 # Nombre max d'offres traitées par run
-MAX_OFFERS_PER_RUN = 3
+MAX_OFFERS_PER_RUN = 10
 
 # Nombre max de contacts par offre à considérer (fallback séquentiel)
-MAX_CONTACTS_PER_OFFER = 2
+MAX_CONTACTS_PER_OFFER = 3
 
 # Âge max (heures) avant nettoyage forcé des JSON locaux non archivés
 STALE_FILE_MAX_AGE_HOURS = 48
 
-# ⚠️ MODE TEST : si la Variable Airflow MAIL_TEST est définie (non vide),
-# TOUS les emails partent vers cette adresse au lieu du vrai contact.
+# ⚠️ MODE TEST : deux Variables Airflow séparées, pour ne jamais perdre
+# l'adresse de test en la togglant :
+#   - MAIL_TEST : l'adresse email de test (reste enregistrée en permanence)
+#   - FORCE_MAIL_TEST : booléen ("true"/"false") qui active ou non la
+#     redirection. Si "true" ET MAIL_TEST définie -> tous les emails
+#     partent vers MAIL_TEST. Si "false" (ou absente) -> envoi réel, même
+#     si MAIL_TEST reste enregistrée.
 # Le contact réel est conservé dans le JSON et loggé, mais jamais utilisé
-# comme destinataire. Laisser vide / non définie pour l'envoi réel.
+# comme destinataire quand le mode test est actif.
 MAIL_TEST = Variable.get("MAIL_TEST", default_var=None) or None
+
+MAIL_TEST_ACTIVE = True
 
 
 # Requête SQL de fetch_next_candidates.sql, chargée en constante pour éviter
-# une lecture disque à chaque appel. Paramètres positionnels ($1, $2, ...),
+# une lecture disque à chaque appel. Paramètres positionnels (%s, ...),
 # cohérents avec la convention utilisée par Database.execute().
 QUERY_FETCH_NEXT_CANDIDATES = """
 WITH eligible_contacts AS (
@@ -98,9 +106,95 @@ WITH eligible_contacts AS (
 
 SELECT *
 FROM eligible_contacts
-WHERE contact_rank <= $1
+WHERE contact_rank <= %s
 ORDER BY score_relevancy DESC, id_offer, contact_rank
-LIMIT $2;
+LIMIT %s;
+"""
+
+# Relances : offres déjà contactées, prochain contact dans l'ordre de
+# confiance, délai de 48h respecté, abandon après 14 jours. Priorité plus
+# basse que QUERY_FETCH_NEXT_CANDIDATES — ne comble que le budget restant.
+QUERY_FETCH_REMINDER = """
+WITH history AS (
+    SELECT
+        id_offer,
+        COUNT(*) AS times_sent,
+        MAX(date) AS last_sent
+    FROM analytics.tracking_application
+    GROUP BY id_offer
+),
+
+eligible_contacts AS (
+    SELECT
+        jo.id_offer,
+        jo.job_title,
+        jo.offer_description,
+        jo.published_at,
+
+        c.id_company,
+        c.company_name,
+
+        cl.id_location,
+        cl.city,
+        cl.country,
+
+        jr.alternative_job_titles,
+        jr.skills_languages,
+        jr.skills_frameworks,
+        jr.skills_aptitudes,
+        jr.skills_soft,
+
+        jrel.score_relevancy,
+
+        cc.id_contact,
+        cc.email AS contact_email,
+        cc.confidence AS contact_confidence,
+        cc.explanation AS contact_explanation,
+
+        ROW_NUMBER() OVER (
+            PARTITION BY jo.id_offer
+            ORDER BY cc.confidence DESC
+        ) AS contact_rank,
+
+        h.times_sent,
+        h.last_sent
+
+    FROM analytics.job_offer jo
+    JOIN analytics.company c
+        ON jo.id_company = c.id_company
+    LEFT JOIN analytics.company_location cl
+        ON jo.id_location = cl.id_location
+    LEFT JOIN analytics.job_requirement jr
+        ON jr.id_offer = jo.id_offer
+    JOIN analytics.job_relevancy jrel
+        ON jrel.id_offer = jo.id_offer
+    JOIN analytics.company_contact cc
+        ON cc.id_company = c.id_company
+    JOIN history h
+        ON h.id_offer = jo.id_offer
+
+    WHERE jo.published_at >= NOW() - INTERVAL '14 days'
+      AND jrel.score_relevancy > 7
+      AND cc.confidence > 0.5
+      AND h.last_sent <= NOW() - INTERVAL '48 hours'
+
+      AND NOT EXISTS (
+          SELECT 1 FROM analytics.tracking_application ta
+          WHERE ta.id_offer = jo.id_offer
+            AND ta.id_contact = cc.id_contact
+      )
+
+      AND NOT EXISTS (
+          SELECT 1 FROM analytics.blacklist bl
+          WHERE bl.id_contact = cc.id_contact
+      )
+)
+
+SELECT *
+FROM eligible_contacts
+WHERE contact_rank = times_sent + 1
+ORDER BY score_relevancy DESC, id_offer
+LIMIT %s;
 """
 
 
@@ -116,39 +210,12 @@ def get_db() -> Database:
         db_channelbinding = Variable.get("DB_CHANNELBIDING", default_var="disable"),
     )
 
-def fetch_next_candidates(
-    max_offers: int = MAX_OFFERS_PER_RUN,
-    max_contacts_per_offer: int = MAX_CONTACTS_PER_OFFER,
-) -> dict[str, dict]:
+def _group_candidates_by_offer(rows: list[dict], max_offers: int) -> dict[str, dict]:
     """
-    Requête unique (voir fetch_next_candidates.sql) : retourne les offres
-    actives (< 7 jours, score_relevancy > 7) avec, pour chacune, jusqu'à
-    max_contacts_per_offer contacts éligibles (pas déjà tenté pour cette
-    offre, pas blacklisté).
-
-    Regroupe le résultat plat de la requête par offre, pour correspondre à
-    la structure attendue par generate_content : une lettre par offre,
-    un email par contact retenu.
-
-    Returns:
-        {
-            "<id_offer>": {
-                "job_context": {...},   # infos offre (job_title, company_name, city, ...)
-                "contacts": [
-                    {"id_contact": ..., "email": ..., "confidence": ..., "explanation": ...},
-                    ...
-                ],
-            },
-            ...
-        }
+    Regroupe un résultat plat (une ligne par contact) en dict par offre.
+    Utilisée pour les deux requêtes (fraîches et relances), même format
+    de sortie attendu par generate_content.
     """
-    db = get_db()
-
-    rows = db.execute(
-        QUERY_FETCH_NEXT_CANDIDATES,
-        [max_contacts_per_offer, max_offers * max_contacts_per_offer],
-    )
-
     candidates: dict[str, dict] = {}
 
     for row in rows:
@@ -156,18 +223,23 @@ def fetch_next_candidates(
 
         if offer_id not in candidates:
             if len(candidates) >= max_offers:
-                # Déjà atteint le nombre max d'offres distinctes pour ce run
                 continue
 
             candidates[offer_id] = {
                 "job_context": {
                     "id_offer": row["id_offer"],
                     "job_title": row["job_title"],
+                    "offer_description": row.get("offer_description"),
                     "id_company": row["id_company"],
                     "company_name": row["company_name"],
                     "id_location": row.get("id_location"),
                     "city": row.get("city"),
                     "country": row.get("country"),
+                    "alternative_job_titles": row.get("alternative_job_titles"),
+                    "skills_languages": row.get("skills_languages"),
+                    "skills_frameworks": row.get("skills_frameworks"),
+                    "skills_aptitudes": row.get("skills_aptitudes"),
+                    "skills_soft": row.get("skills_soft"),
                 },
                 "contacts": [],
             }
@@ -179,6 +251,43 @@ def fetch_next_candidates(
                 "confidence": row.get("contact_confidence"),
                 "explanation": row.get("contact_explanation"),
             })
+
+    return candidates
+
+
+def fetch_next_candidates(max_offers: int = MAX_OFFERS_PER_RUN) -> dict[str, dict]:
+    """
+    Combine deux sources, dans cet ordre de priorité :
+        1. Offres jamais contactées (QUERY_FETCH_NEXT_CANDIDATES)
+        2. Relances sur offres déjà contactées, si le budget max_offers
+           n'est pas atteint par les offres fraîches (QUERY_FETCH_REMINDER)
+
+    Les offres fraîches ont toujours priorité — les relances ne comblent
+    que le budget restant, jamais au détriment d'une offre jamais tentée.
+
+    Returns:
+        Même format que précédemment : {"<id_offer>": {"job_context": {...}, "contacts": [...]}, ...}
+    """
+    db = get_db()
+
+    fresh_rows = db.execute(
+        QUERY_FETCH_NEXT_CANDIDATES,
+        [MAX_CONTACTS_PER_OFFER, max_offers * MAX_CONTACTS_PER_OFFER],
+    )
+    candidates = _group_candidates_by_offer(fresh_rows, max_offers)
+
+    remaining_budget = max_offers - len(candidates)
+
+    if remaining_budget > 0:
+        reminder_rows = db.execute(QUERY_FETCH_REMINDER, [remaining_budget])
+        reminder_candidates = _group_candidates_by_offer(reminder_rows, remaining_budget)
+        candidates.update(reminder_candidates)
+
+    logger.info(
+        f"[GENERATE] fresh_offers={len(_group_candidates_by_offer(fresh_rows, max_offers))} "
+        f"reminder_offers={len(candidates) - len(_group_candidates_by_offer(fresh_rows, max_offers))} "
+        f"total={len(candidates)}"
+    )
 
     return candidates
 
@@ -254,7 +363,7 @@ def automated_application():
             Liste des chemins de fichiers JSON générés (ou déjà existants).
         """
         from llm_application import resolve_document
-        from LLMprovider import LLM
+        from LLMProvider import LLM
         from pdf_maker import load_yaml
 
         APPLICATIONS_PATH.mkdir(parents=True, exist_ok=True)
@@ -366,8 +475,8 @@ def automated_application():
         Pour chaque JSON généré : charge candidate_info, formate email + PDF
         (aucun appel LLM ici), envoie via Gmail au contact sélectionné.
 
-        Si MAIL_TEST est défini, tous les emails partent vers cette adresse
-        au lieu du vrai contact (mode test).
+        Si FORCE_MAIL_TEST est activé (et MAIL_TEST définie), tous les
+        emails partent vers cette adresse au lieu du vrai contact (mode test).
 
         Returns:
             Liste de dicts {path, offer_id, contact_email, message_id}
@@ -384,7 +493,7 @@ def automated_application():
         from googleapiclient.discovery import build as gmail_build
 
         profile = load_yaml(str(CONFIG_PATH / "candidate_info.yaml"))
-        cv_path = CONFIG_PATH / "cv_static.pdf"
+        cv_path = CONFIG_PATH / "cv.pdf"
 
         if not cv_path.exists():
             raise FileNotFoundError(f"CV introuvable : {cv_path}")
@@ -393,7 +502,7 @@ def automated_application():
         service = gmail_build("gmail", "v1", credentials=creds)
         label_id = get_or_create_label(service, LABEL_NAME)
 
-        if MAIL_TEST:
+        if MAIL_TEST_ACTIVE:
             logger.warning(f"[SEND] MODE TEST ACTIF — tous les emails partent vers {MAIL_TEST}")
 
         sent_records = []
@@ -406,7 +515,7 @@ def automated_application():
 
             # En mode test, on redirige le destinataire mais on garde une
             # trace du contact réel qui aurait été utilisé.
-            recipient = MAIL_TEST if MAIL_TEST else real_contact_email
+            recipient = MAIL_TEST if MAIL_TEST_ACTIVE else real_contact_email
 
             # --- Formatage email (candidate_info injecté ici, en mémoire) ---
             email_rendered_greeting = application_data["email"]["greeting_line"]
@@ -430,7 +539,7 @@ def automated_application():
             subject = email_rendered["subject"]
             body = email_rendered["body"]
 
-            if MAIL_TEST:
+            if MAIL_TEST_ACTIVE:
                 subject = f"[TEST] {subject}"
                 body = (
                     f"--- MODE TEST ---\n"
