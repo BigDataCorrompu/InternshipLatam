@@ -275,8 +275,9 @@ def fetch_next_candidates(max_offers: int = MAX_OFFERS_PER_RUN) -> dict[str, dic
         [MAX_CONTACTS_PER_OFFER, max_offers * MAX_CONTACTS_PER_OFFER],
     )
     candidates = _group_candidates_by_offer(fresh_rows, max_offers)
+    fresh_count = len(candidates)
 
-    remaining_budget = max_offers - len(candidates)
+    remaining_budget = max_offers - fresh_count
 
     if remaining_budget > 0:
         reminder_rows = db.execute(QUERY_FETCH_REMINDER, [remaining_budget])
@@ -284,8 +285,8 @@ def fetch_next_candidates(max_offers: int = MAX_OFFERS_PER_RUN) -> dict[str, dic
         candidates.update(reminder_candidates)
 
     logger.info(
-        f"[GENERATE] fresh_offers={len(_group_candidates_by_offer(fresh_rows, max_offers))} "
-        f"reminder_offers={len(candidates) - len(_group_candidates_by_offer(fresh_rows, max_offers))} "
+        f"[GENERATE] fresh_offers={fresh_count} "
+        f"reminder_offers={len(candidates) - fresh_count} "
         f"total={len(candidates)}"
     )
 
@@ -374,7 +375,6 @@ def automated_application():
 
         candidates = fetch_next_candidates(
             max_offers=MAX_OFFERS_PER_RUN,
-            max_contacts_per_offer=MAX_CONTACTS_PER_OFFER,
         )
         if not candidates:
             raise AirflowSkipException("Aucune offre/contact éligible à traiter ce run")
