@@ -28,10 +28,10 @@ DATA_TYPE = "job_application"
 LABEL_NAME = "automation_mail"
 
 # Nombre max d'offres traitées par run
-MAX_OFFERS_PER_RUN = 10
+MAX_OFFERS_PER_RUN = 2
 
 # Nombre max de contacts par offre à considérer (fallback séquentiel)
-MAX_CONTACTS_PER_OFFER = 3
+MAX_CONTACTS_PER_OFFER = 2
 
 # Âge max (heures) avant nettoyage forcé des JSON locaux non archivés
 STALE_FILE_MAX_AGE_HOURS = 48
