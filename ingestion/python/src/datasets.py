@@ -5,7 +5,7 @@ from airflow.datasets import Dataset
 Airflow chain scheduler
 """
 
-
+# Ingestion _____________________________________________________
 # Zone raw B2 - produite par les fetchs
 B2_RAW = Dataset("b2://job_offer") 
 
@@ -25,3 +25,7 @@ SILVER_CONTACTS = Dataset("neon://analytics.company_contact")
 # Gold materialized views
 GOLD_OFFERS = Dataset("neon://serving.job_offer")
 GOLD_HEALTH = Dataset("neon://serving.pipeline_health")
+
+
+# Application _____________________________________________________
+BLACKLIST = Dataset("neon://analytics.blacklist")

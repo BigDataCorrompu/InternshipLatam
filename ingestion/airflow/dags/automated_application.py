@@ -6,7 +6,7 @@ from airflow.exceptions import AirflowSkipException
 from utils import write_json, load_json, cleanup_stale_files
 from bucket import Bucket
 from database import Database
-from datasets import B2_RAW  # ou un Dataset dédié aux candidatures, à créer si besoin
+from datasets import BLACKLIST  # ou un Dataset dédié aux candidatures, à créer si besoin
 
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -59,26 +59,26 @@ WITH eligible_contacts AS (
         jo.id_offer,
         jo.job_title,
         jo.published_at,
-
+ 
         c.id_company,
         c.company_name,
-
+ 
         cl.id_location,
         cl.city,
         cl.country,
-
+ 
         jrel.score_relevancy,
-
+ 
         cc.id_contact,
         cc.email AS contact_email,
         cc.confidence AS contact_confidence,
         cc.explanation AS contact_explanation,
-
+ 
         ROW_NUMBER() OVER (
             PARTITION BY jo.id_offer
             ORDER BY cc.confidence DESC
         ) AS contact_rank
-
+ 
     FROM analytics.job_offer jo
     JOIN analytics.company c
         ON jo.id_company = c.id_company
@@ -88,29 +88,29 @@ WITH eligible_contacts AS (
         ON jrel.id_offer = jo.id_offer
     JOIN analytics.company_contact cc
         ON cc.id_company = c.id_company
-
+ 
     WHERE jo.published_at >= NOW() - INTERVAL '7 days'
       AND jrel.score_relevancy > 7
-
+ 
       AND NOT EXISTS (
           SELECT 1 FROM analytics.tracking_application ta
           WHERE ta.id_offer = jo.id_offer
             AND ta.id_contact = cc.id_contact
       )
-
+ 
       AND NOT EXISTS (
           SELECT 1 FROM analytics.blacklist bl
-          WHERE bl.id_contact = cc.id_contact
+          WHERE LOWER(bl.email) = LOWER(cc.email)
       )
 )
-
+ 
 SELECT *
 FROM eligible_contacts
 WHERE contact_rank <= %s
 ORDER BY score_relevancy DESC, id_offer, contact_rank
 LIMIT %s;
 """
-
+ 
 # Relances : offres déjà contactées, prochain contact dans l'ordre de
 # confiance, délai de 48h respecté, abandon après 14 jours. Priorité plus
 # basse que QUERY_FETCH_NEXT_CANDIDATES — ne comble que le budget restant.
@@ -123,42 +123,42 @@ WITH history AS (
     FROM analytics.tracking_application
     GROUP BY id_offer
 ),
-
+ 
 eligible_contacts AS (
     SELECT
         jo.id_offer,
         jo.job_title,
         jo.offer_description,
         jo.published_at,
-
+ 
         c.id_company,
         c.company_name,
-
+ 
         cl.id_location,
         cl.city,
         cl.country,
-
+ 
         jr.alternative_job_titles,
         jr.skills_languages,
         jr.skills_frameworks,
         jr.skills_aptitudes,
         jr.skills_soft,
-
+ 
         jrel.score_relevancy,
-
+ 
         cc.id_contact,
         cc.email AS contact_email,
         cc.confidence AS contact_confidence,
         cc.explanation AS contact_explanation,
-
+ 
         ROW_NUMBER() OVER (
             PARTITION BY jo.id_offer
             ORDER BY cc.confidence DESC
         ) AS contact_rank,
-
+ 
         h.times_sent,
         h.last_sent
-
+ 
     FROM analytics.job_offer jo
     JOIN analytics.company c
         ON jo.id_company = c.id_company
@@ -172,31 +172,30 @@ eligible_contacts AS (
         ON cc.id_company = c.id_company
     JOIN history h
         ON h.id_offer = jo.id_offer
-
+ 
     WHERE jo.published_at >= NOW() - INTERVAL '14 days'
       AND jrel.score_relevancy > 7
       AND cc.confidence > 0.5
       AND h.last_sent <= NOW() - INTERVAL '48 hours'
-
+ 
       AND NOT EXISTS (
           SELECT 1 FROM analytics.tracking_application ta
           WHERE ta.id_offer = jo.id_offer
             AND ta.id_contact = cc.id_contact
       )
-
+ 
       AND NOT EXISTS (
           SELECT 1 FROM analytics.blacklist bl
-          WHERE bl.id_contact = cc.id_contact
+          WHERE LOWER(bl.email) = LOWER(cc.email)
       )
 )
-
+ 
 SELECT *
 FROM eligible_contacts
 WHERE contact_rank = times_sent + 1
 ORDER BY score_relevancy DESC, id_offer
 LIMIT %s;
 """
-
 
 # ___ HELPERS _________________________________________________________________
 
@@ -325,7 +324,7 @@ def track_application_sent(records: list[tuple]) -> None:
 @dag(
     dag_id='automated_application',
     start_date=datetime(2026, 6, 7),
-    schedule=SCHEDULE,
+    schedule=[BLACKLIST],
     catchup=False,
     max_active_runs=1,
     tags=["silver", "application", "llm"],
@@ -585,7 +584,7 @@ def automated_application():
         return sent_records
 
 
-    @task(task_id="archive_application", outlets=[B2_RAW])
+    @task(task_id="archive_application")
     def archive_application(sent_records: list[dict], ds=None) -> None:
         """
         Pour chaque candidature envoyée : upload du JSON vers B2 sous

@@ -24,7 +24,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 # Scope restreint : envoi d'emails uniquement (principe du moindre privilège)
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.modify"
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/spreadsheets.readonly"
     ]
 
 CLIENT_SECRET_FILE = ".client_secret.json"
