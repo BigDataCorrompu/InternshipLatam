@@ -91,7 +91,12 @@ def get_or_create_label(service, label_name):
 # Construction du message avec pièces jointes
 # ---------------------------------------------------------------------------
 
-def attach_file(message: MIMEMultipart, file_path: str):
+def attach_file(message: MIMEMultipart, file_path: str, display_name: str = None):
+    """
+    display_name : nom de fichier tel qu'il apparaît pour le destinataire
+    (ex: "Cover_Letter_Prenom_Nom.pdf"). Si omis, utilise le nom du
+    fichier local tel quel — souvent un identifiant technique peu présentable.
+    """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Pièce jointe introuvable : {file_path}")
 
@@ -105,14 +110,19 @@ def attach_file(message: MIMEMultipart, file_path: str):
         part.set_payload(f.read())
 
     encoders.encode_base64(part)
+    filename = display_name or os.path.basename(file_path)
     part.add_header(
         "Content-Disposition",
-        f'attachment; filename="{os.path.basename(file_path)}"',
+        f'attachment; filename="{filename}"',
     )
     message.attach(part)
 
 
-def build_message_with_attachments(to_address, subject, body_text, attachment_paths):
+def build_message_with_attachments(to_address, subject, body_text, attachments):
+    """
+    attachments : liste d'éléments soit str (chemin local, nom d'affichage =
+    nom du fichier), soit tuple (chemin local, nom d'affichage explicite).
+    """
     message = MIMEMultipart()
     message["to"] = to_address
     message["subject"] = subject
@@ -120,8 +130,12 @@ def build_message_with_attachments(to_address, subject, body_text, attachment_pa
 
     message.attach(MIMEText(body_text, "plain"))
 
-    for path in attachment_paths:
-        attach_file(message, path)
+    for item in attachments:
+        if isinstance(item, tuple):
+            path, display_name = item
+        else:
+            path, display_name = item, None
+        attach_file(message, path, display_name)
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     return {"raw": raw}

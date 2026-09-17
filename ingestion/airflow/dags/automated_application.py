@@ -28,10 +28,10 @@ DATA_TYPE = "job_application"
 LABEL_NAME = "automation_mail"
 
 # Nombre max d'offres traitées par run
-MAX_OFFERS_PER_RUN = 2
+MAX_OFFERS_PER_RUN = 10
 
 # Nombre max de contacts par offre à considérer (fallback séquentiel)
-MAX_CONTACTS_PER_OFFER = 2
+MAX_CONTACTS_PER_OFFER = 4
 
 # Âge max (heures) avant nettoyage forcé des JSON locaux non archivés
 STALE_FILE_MAX_AGE_HOURS = 48
@@ -59,26 +59,26 @@ WITH eligible_contacts AS (
         jo.id_offer,
         jo.job_title,
         jo.published_at,
- 
+
         c.id_company,
         c.company_name,
- 
+
         cl.id_location,
         cl.city,
         cl.country,
- 
+
         jrel.score_relevancy,
- 
+
         cc.id_contact,
         cc.email AS contact_email,
         cc.confidence AS contact_confidence,
         cc.explanation AS contact_explanation,
- 
+
         ROW_NUMBER() OVER (
             PARTITION BY jo.id_offer
             ORDER BY cc.confidence DESC
         ) AS contact_rank
- 
+
     FROM analytics.job_offer jo
     JOIN analytics.company c
         ON jo.id_company = c.id_company
@@ -88,31 +88,31 @@ WITH eligible_contacts AS (
         ON jrel.id_offer = jo.id_offer
     JOIN analytics.company_contact cc
         ON cc.id_company = c.id_company
- 
+
     WHERE jo.published_at >= NOW() - INTERVAL '7 days'
       AND jrel.score_relevancy > 7
- 
+
       AND NOT EXISTS (
           SELECT 1 FROM analytics.tracking_application ta
           WHERE ta.id_offer = jo.id_offer
             AND ta.id_contact = cc.id_contact
       )
- 
+
       AND NOT EXISTS (
           SELECT 1 FROM analytics.blacklist bl
           WHERE LOWER(bl.email) = LOWER(cc.email)
       )
 )
- 
+
 SELECT *
 FROM eligible_contacts
 WHERE contact_rank <= %s
 ORDER BY score_relevancy DESC, id_offer, contact_rank
 LIMIT %s;
 """
- 
+
 # Relances : offres déjà contactées, prochain contact dans l'ordre de
-# confiance, délai de 48h respecté, abandon après 14 jours. Priorité plus
+# confiance, délai de 72h respecté, abandon après 14 jours. Priorité plus
 # basse que QUERY_FETCH_NEXT_CANDIDATES — ne comble que le budget restant.
 QUERY_FETCH_REMINDER = """
 WITH history AS (
@@ -123,42 +123,42 @@ WITH history AS (
     FROM analytics.tracking_application
     GROUP BY id_offer
 ),
- 
+
 eligible_contacts AS (
     SELECT
         jo.id_offer,
         jo.job_title,
         jo.offer_description,
         jo.published_at,
- 
+
         c.id_company,
         c.company_name,
- 
+
         cl.id_location,
         cl.city,
         cl.country,
- 
+
         jr.alternative_job_titles,
         jr.skills_languages,
         jr.skills_frameworks,
         jr.skills_aptitudes,
         jr.skills_soft,
- 
+
         jrel.score_relevancy,
- 
+
         cc.id_contact,
         cc.email AS contact_email,
         cc.confidence AS contact_confidence,
         cc.explanation AS contact_explanation,
- 
+
         ROW_NUMBER() OVER (
             PARTITION BY jo.id_offer
             ORDER BY cc.confidence DESC
         ) AS contact_rank,
- 
+
         h.times_sent,
         h.last_sent
- 
+
     FROM analytics.job_offer jo
     JOIN analytics.company c
         ON jo.id_company = c.id_company
@@ -172,24 +172,24 @@ eligible_contacts AS (
         ON cc.id_company = c.id_company
     JOIN history h
         ON h.id_offer = jo.id_offer
- 
+
     WHERE jo.published_at >= NOW() - INTERVAL '14 days'
       AND jrel.score_relevancy > 7
       AND cc.confidence > 0.5
-      AND h.last_sent <= NOW() - INTERVAL '48 hours'
- 
+      AND h.last_sent <= NOW() - INTERVAL '72 hours'
+
       AND NOT EXISTS (
           SELECT 1 FROM analytics.tracking_application ta
           WHERE ta.id_offer = jo.id_offer
             AND ta.id_contact = cc.id_contact
       )
- 
+
       AND NOT EXISTS (
           SELECT 1 FROM analytics.blacklist bl
           WHERE LOWER(bl.email) = LOWER(cc.email)
       )
 )
- 
+
 SELECT *
 FROM eligible_contacts
 WHERE contact_rank = times_sent + 1
@@ -299,12 +299,14 @@ def track_application_sent(records: list[tuple]) -> None:
     candidature dans la boucle d'archivage.
 
     Args:
-        records: liste de tuples (id_offer, id_location, id_company, id_contact),
-            dans cet ordre exact — doit correspondre à `columns` ci-dessous.
+        records: liste de tuples (id_offer, id_location, id_company,
+            id_contact, b2_key), dans cet ordre exact — doit correspondre
+            à `columns` ci-dessous.
 
-    ON CONFLICT (id_offer, id_contact) DO NOTHING : idempotent, cohérent
-    avec la contrainte UNIQUE de la table — un doublon (ex: run rejoué)
-    est silencieusement ignoré plutôt que de lever une erreur.
+    Pas de ON CONFLICT : la table n'a plus de contrainte UNIQUE (voir
+    migration 005) — un même contact peut légitimement recevoir plusieurs
+    emails pour la même offre au fil de relances successives, chaque envoi
+    réussi devient sa propre ligne, sans déduplication.
     """
     if not records:
         return
@@ -312,11 +314,16 @@ def track_application_sent(records: list[tuple]) -> None:
     db = get_db()
     db.bulk_insert(
         table="analytics.tracking_application",
-        columns=["id_offer", "id_location", "id_company", "id_contact"],
+        columns=["id_offer", "id_location", "id_company", "id_contact", "b2_key"],
         data=records,
-        onConflict="nothing",
-        conflict_columns=["id_offer", "id_contact"],
     )
+
+
+def _safe_filename_part(text: str, fallback: str = "Unknown") -> str:
+    """Remplace tout caractère non alphanumérique par '_', pour un nom de
+    fichier propre en pièce jointe (évite espaces, accents, ponctuation)."""
+    text = text or fallback
+    return "".join(c if c.isalnum() else "_" for c in text).strip("_") or fallback
 
 
 # ___ DAG _____________________________________________________________________
@@ -497,6 +504,14 @@ def automated_application():
         if not cv_path.exists():
             raise FileNotFoundError(f"CV introuvable : {cv_path}")
 
+        # Nom d'affichage du CV (identique pour tous les envois, ne dépend
+        # pas de l'offre) : "CV_Prenom_Nom.pdf" plutôt que le nom du
+        # fichier local "cv.pdf".
+        cv_display_name = (
+            f"CV_{_safe_filename_part(profile.get('candidate_first_name'))}_"
+            f"{_safe_filename_part(profile.get('candidate_last_name'))}.pdf"
+        )
+
         creds = load_credentials()
         service = gmail_build("gmail", "v1", credentials=creds)
         label_id = get_or_create_label(service, LABEL_NAME)
@@ -532,8 +547,20 @@ def automated_application():
                 "greeting_line": email_rendered_greeting,
             }
             pdf_context = {**profile, **letter_for_this_contact}
+
+            # Nom local (chemin disque) : reste technique, sert au tracking
+            # local et au nettoyage — jamais vu par le destinataire.
             pdf_path = APPLICATIONS_PATH / f"{offer_id}_{id_contact}_cover_letter.pdf"
             render_pdf(pdf_context, output_path=str(pdf_path))
+
+            # Nom d'affichage (pièce jointe telle que le destinataire la
+            # voit) : lisible, basé sur le candidat et l'entreprise ciblée.
+            company_name = application_data["job_context"].get("company_name")
+            cover_letter_display_name = (
+                f"Cover_Letter_{_safe_filename_part(profile.get('candidate_first_name'))}_"
+                f"{_safe_filename_part(profile.get('candidate_last_name'))}_"
+                f"{_safe_filename_part(company_name, fallback='Company')}.pdf"
+            )
 
             subject = email_rendered["subject"]
             body = email_rendered["body"]
@@ -554,7 +581,10 @@ def automated_application():
                 to_address=recipient,
                 subject=subject,
                 body_text=body,
-                attachment_paths=[str(cv_path), str(pdf_path)],
+                attachments=[
+                    (str(cv_path), cv_display_name),
+                    (str(pdf_path), cover_letter_display_name),
+                ],
             )
 
             try:
@@ -593,6 +623,8 @@ def automated_application():
 
         Le tracking en base (analytics.tracking_application) est fait en
         UN SEUL bulk_insert après la boucle, pas un execute() par ligne.
+        Le chemin B2 (remote_key) est stocké dans la colonne b2_key, pour
+        pouvoir retrouver le JSON archivé depuis une ligne de tracking.
         """
         bucket = Bucket(
             key_id=Variable.get("KEY_ID"),
@@ -624,6 +656,7 @@ def automated_application():
                 record.get("id_location"),
                 record.get("id_company"),
                 id_contact,
+                remote_key,
             ))
 
             # Nettoyage local uniquement après confirmation d'upload
