@@ -378,10 +378,11 @@ class FindLocation:
         if result.get('lat') is None or result.get('lon') is None:
             return result
         reverse_geocode = reverse_geocoder.search((result['lat'], result['lon']), mode=1)
-        geocode = {
-            'city': reverse_geocode[0]['admin1'],
-            'country': reverse_geocode[0]['cc']
-        }
+        geocode = {}
+        if not state.get('country'):
+            geocode['country'] = reverse_geocode[0]['cc']
+        if not state.get('city'):
+            geocode['city'] = reverse_geocode[0]['admin1']
         return result | geocode
     
 
