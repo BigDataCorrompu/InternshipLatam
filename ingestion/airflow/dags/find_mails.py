@@ -112,6 +112,23 @@ def find_mails_dag():
                     )
                 )
             )
+            AND (
+                -- N'exclut que si l'entreprise a des contacts ET qu'ils
+                -- sont TOUS blacklistés. Une entreprise sans contact connu
+                -- reste éligible (cas normal, pas encore recherchée).
+                NOT EXISTS (
+                    SELECT 1 FROM analytics.company_contact cc2
+                    WHERE cc2.id_company = c.id_company
+                )
+                OR EXISTS (
+                    SELECT 1 FROM analytics.company_contact cc
+                    WHERE cc.id_company = c.id_company
+                    AND NOT EXISTS (
+                        SELECT 1 FROM analytics.blacklist bl
+                        WHERE LOWER(bl.email) = LOWER(cc.email)
+                    )
+                )
+            )
             GROUP BY c.id_company, c.company_name, c.website,
                     cl.id_location, cl.city, cl.country
             HAVING MAX(jr.score_relevancy) >= %(min_grade)s
