@@ -41,7 +41,7 @@ html_template = Template("""
         background-color: #5b8fc7;
         height: 2px;
         width: 100%;
-        margin-bottom: 22px;
+        margin-bottom: 18px;
     }
     /* Bloc nom : Prenom au-dessus de NOM, police douce et arrondie, en bleu */
     .name-block {
@@ -72,7 +72,7 @@ html_template = Template("""
     }
     .header-table {
         width: 100%;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
     }
     .header-table td {
         vertical-align: top;
@@ -82,7 +82,7 @@ html_template = Template("""
         font-size: 13pt;
         font-style: italic;
         color: #1a1a1a;
-        margin-top: 20px;
+        margin-top: 14px;
         margin-bottom: 4px;
     }
     /* Zone objectif, sous le header — en gras */
@@ -90,7 +90,7 @@ html_template = Template("""
         font-size: 13pt;
         font-weight: bold;
         color: #333333;
-        margin-bottom: 14px;
+        margin-bottom: 10px;
     }
     /* Barre bleue sous la ligne "objective" */
     .objective-bar {
@@ -102,23 +102,23 @@ html_template = Template("""
     .date-line {
         font-size: 9.5pt;
         color: #777777;
-        margin-top: 6px;
+        margin-top: 4px;
         margin-bottom: 0px;
     }
     .greeting {
-        margin-top: 22px;
-        margin-bottom: 16px;
+        margin-top: 16px;
+        margin-bottom: 12px;
     }
     p {
-        margin-bottom: 14px;
+        margin-bottom: 10px;
         text-align: justify;
     }
     .signature {
-        margin-top: 24px;
+        margin-top: 16px;
     }
     @page {
         size: letter;
-        margin: 1.2cm 2.5cm 2.2cm 2.5cm;
+        margin: 1cm 2.5cm 1cm 2.5cm;
     }
 </style>
 </head>
@@ -184,14 +184,14 @@ def render_pdf_raw(context: dict, output_path: str) -> None:
     vérifie rien — c'est render_pdf() qui orchestre la boucle de réduction.
     """
     html_content = html_template.render(**context)
- 
+
     with open(output_path, "wb") as pdf_file:
         result = pisa.CreatePDF(html_content, dest=pdf_file)
- 
+
     if result.err:
         raise RuntimeError(f"Erreur lors de la génération du PDF ({result.err} erreur(s))")
- 
- 
+
+
 def render_pdf(
     context: dict,
     output_path: str = "cover_letter.pdf",
@@ -209,8 +209,9 @@ def render_pdf(
             (10.5, 1.45),
             (10, 1.4),
             (9.5, 1.35),
+            (9, 1.3),
         ]
- 
+
     for font_size, line_height in font_sizes:
         render_context = {
             **context,
@@ -218,25 +219,25 @@ def render_pdf(
             "body_line_height": line_height,
         }
         render_pdf_raw(render_context, output_path)
- 
+
         page_count = count_pdf_pages(output_path)
         if page_count <= 1:
             print(f"✅ PDF généré : {output_path} ({font_size}pt, 1 page)")
             return output_path
- 
+
     print(
         f"⚠️ PDF généré : {output_path} — ne tient toujours pas sur une page "
         f"même à {font_sizes[-1][0]}pt. Contenu probablement trop long, "
         f"raccourcir un paragraphe."
     )
     return output_path
- 
+
 if __name__ == "__main__":
     # Test rapide sans résolution LLM : les paragraphes {"llm": ...} restants
     # dans letter_content.yaml seraient affichés en brut (dict Python) si
     # présents — utiliser email_sender.py pour un rendu complet.
     profile = load_yaml("candidate_info.yaml")
     letter = load_yaml("letter_content.yaml")
- 
+
     context = {**profile, **letter}
     render_pdf(context)

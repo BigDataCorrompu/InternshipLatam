@@ -106,8 +106,11 @@ Rules:
   to avoid repeating the same ideas, facts, or phrasing across paragraphs —
   each paragraph must add something new and distinct.
 - Write in English.
-- Keep each paragraph concise: 3 to 5 sentences maximum. The full letter
-  must fit on a single page — favor precision over exhaustiveness.
+- Keep each paragraph SHORT: 2 to 4 sentences maximum, never more. This
+  document already contains several other paragraphs (static and
+  generated) — the full letter must fit on a single printed page, so
+  favor precision and brevity over exhaustiveness. When in doubt, cut a
+  sentence rather than keep it.
 - CRITICAL: output PLAIN TEXT ONLY. Never use markdown formatting of any
   kind — no asterisks for bold or italics (**word** or *word*), no
   underscores, no bullet points, no headers, no backticks. Company names,
@@ -120,7 +123,6 @@ Rules:
 - Follow the JSON output schema exactly: one greeting line, and one
   paragraph per numbered instruction, in the same order.
 """
-
 
 # ---------------------------------------------------------------------------
 # Nettoyage post-génération (filet de sécurité)
