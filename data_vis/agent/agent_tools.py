@@ -96,6 +96,9 @@ def build_agent_tools(df, dict_reversed_index, city_country_map, get_current_fil
         if selected_ids:
             current = current[current.index.isin(selected_ids)]
 
+        # Ignore unkown
+        current = current[~current["company_name"].str.strip().str.lower().eq("unknown")]
+
         if company_name:
             current = current[current["company_name"].str.contains(company_name, case=False, na=False)]
         if current.empty:

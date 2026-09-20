@@ -32,7 +32,7 @@ class DashboardAgent:
         making up a result.
         """
 
-    def __init__(self, llm, tools: list, system_context: str = "", max_iterations: int = 4, session_id: str = "default"):
+    def __init__(self, llm, tools: list, system_context: str = "", max_iterations: int = 5, session_id: str = "default"):
         # prompt_cache_key must stay stable across calls in the same session
         # for Mistral to actually reuse the cached prefix (system prompt + history).
         llm_with_cache = llm.bind(prompt_cache_key=f"dashboard-{session_id}")
