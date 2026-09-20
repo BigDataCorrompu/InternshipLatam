@@ -105,6 +105,12 @@ Rules:
   once, plus the static paragraphs already fixed in the document. Use this
   to avoid repeating the same ideas, facts, or phrasing across paragraphs —
   each paragraph must add something new and distinct.
+- When mentioning a technology or tool from the job posting, only claim
+  direct hands-on experience with tools listed in the candidate's own
+  skills (given in context). For a tool or platform mentioned in the
+  posting that is NOT in the candidate's skills, frame it as something the
+  candidate is eager to learn or build expertise in, never as something
+  already mastered.
 - Write in English.
 - Keep each paragraph SHORT: 2 to 4 sentences maximum, never more. This
   document already contains several other paragraphs (static and

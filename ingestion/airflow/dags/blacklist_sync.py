@@ -25,7 +25,7 @@ SHEET_RANGE_NAME = Variable.get(
 # dans la Google Sheet, jamais dupliqué en DB.
 EMAIL_COLUMN = "Exact Email Address to be excluded"
 
-SCHEDULE = "0 6 * * *"  # une fois par jour
+SCHEDULE = "0 13 * * *"  # une fois par jour
 
 
 # ___ HELPERS _________________________________________________________________

@@ -47,7 +47,7 @@ STALE_FILE_MAX_AGE_HOURS = 48
 # comme destinataire quand le mode test est actif.
 MAIL_TEST = Variable.get("MAIL_TEST", default_var=None) or None
 
-MAIL_TEST_ACTIVE = True
+MAIL_TEST_ACTIVE = False
 
 
 # Requête SQL de fetch_next_candidates.sql, chargée en constante pour éviter
@@ -112,7 +112,7 @@ LIMIT %s;
 """
 
 # Relances : offres déjà contactées, prochain contact dans l'ordre de
-# confiance, délai de 72h respecté, abandon après 14 jours. Priorité plus
+# confiance, délai de 60h respecté, abandon après 14 jours. Priorité plus
 # basse que QUERY_FETCH_NEXT_CANDIDATES — ne comble que le budget restant.
 QUERY_FETCH_REMINDER = """
 WITH history AS (
@@ -176,7 +176,7 @@ eligible_contacts AS (
     WHERE jo.published_at >= NOW() - INTERVAL '14 days'
       AND jrel.score_relevancy > 7
       AND cc.confidence > 0.5
-      AND h.last_sent <= NOW() - INTERVAL '72 hours'
+      AND h.last_sent <= NOW() - INTERVAL '60 hours'
 
       AND NOT EXISTS (
           SELECT 1 FROM analytics.tracking_application ta

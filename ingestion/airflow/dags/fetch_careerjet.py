@@ -34,7 +34,7 @@ MAX_DAYS_CAREERJET = 2
 
 # Parameter of frequency
 SCHEDULE_PERIOD = 1 # 3 days
-SCHEDULE = "0 19 * * *"
+SCHEDULE = "0 22 * * *"
 
 JOB_OFFER_TABLE = 'raw.job_offer'
 CONFIG = "careerjet_search_config"

@@ -19,8 +19,8 @@ RAW_PATH = Path(os.getenv('RAW_DATA_PATH', '/opt/airflow/raw'))
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/opt/airflow/config"))
 
 # Parameter of frequency
-SCHEDULE_PERIOD = 1 # 3 days
-SCHEDULE = "0 20 * * *"
+SCHEDULE_PERIOD = 3 # 3 days
+SCHEDULE = "0 21 */3 * *"
 
 JOB_OFFER_TABLE = 'raw.job_offer'
 CONFIG = "jsearch_search_config"
@@ -34,8 +34,8 @@ DATA_TYPE = "job_offer"
 
 @dag(
     dag_id='fetch_jsearch_pipeline',
-    start_date=datetime(2026, 6, 7), 
-    schedule=SCHEDULE,
+    start_date=datetime(2026, 6, 7, 21, 0), 
+    schedule=timedelta(SCHEDULE_PERIOD),
     catchup=False,
     max_active_runs=1,
     tags = ["ingestion", "job_offer", "landing"],

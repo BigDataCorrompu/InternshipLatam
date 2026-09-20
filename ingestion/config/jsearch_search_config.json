@@ -3,11 +3,11 @@
         "date_posted": "3days"
     },
     "queries": [
-        {"query": "data engineer", "location": "Santiago", "country": "cl", "num_pages": 2},
-        {"query": "data engineer", "location": "Buenos Aires", "country": "ar", "num_pages": 2},
-        {"query": "data engineer", "location": "Montevideo", "country": "uy", "num_pages": 1},
+        {"query": "data engineer Santiago", "country": "cl", "num_pages": 2},
+        {"query": "data engineer Buenos Aires", "country": "ar", "num_pages": 2},
+        {"query": "data engineer Montevideo", "country": "uy", "num_pages": 1},
 
-        {"query": "junior data engineer", "location": "Santiago", "country": "cl", "num_pages": 1},
-        {"query": "junior data engineer", "location": "Buenos Aires", "country": "ar", "num_pages": 1}
+        {"query": "junior data engineer Santiago", "country": "cl", "num_pages": 1},
+        {"query": "junior data engineer Buenos Aires", "country": "ar", "num_pages": 1}
     ]
 }
