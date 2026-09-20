@@ -197,6 +197,27 @@ ORDER BY score_relevancy DESC, id_offer
 LIMIT %s;
 """
 
+# Mots-clés des autres offres pertinentes de la même entreprise (score > 5,
+# < 30 jours), pour donner au LLM un contexte plus large des besoins de
+# l'entreprise SANS lui donner l'offre ciblée elle-même. Batché sur toutes
+# les entreprises du run en une seule requête (pas de N+1).
+QUERY_FETCH_COMPANY_KEYWORDS = """
+    SELECT
+        jo.id_company,
+        jo.id_offer,
+        jr.skills_languages,
+        jr.skills_frameworks,
+        jr.skills_aptitudes
+    FROM analytics.job_offer jo
+    JOIN analytics.job_relevancy jrel
+        ON jrel.id_offer = jo.id_offer
+    LEFT JOIN analytics.job_requirement jr
+        ON jr.id_offer = jo.id_offer
+    WHERE jo.id_company = ANY(%s::int[])
+      AND jrel.score_relevancy > 5
+      AND jo.published_at >= NOW() - INTERVAL '30 days'
+"""
+
 # ___ HELPERS _________________________________________________________________
 
 def get_db() -> Database:
@@ -292,6 +313,47 @@ def fetch_next_candidates(max_offers: int = MAX_OFFERS_PER_RUN) -> dict[str, dic
     return candidates
 
 
+def fetch_company_keywords(company_ids: list[int]) -> dict[int, list[dict]]:
+    """
+    Récupère, pour chaque entreprise donnée, toutes ses offres pertinentes
+    (score > 5, < 30 jours) avec leurs champs de compétences bruts — une
+    seule requête pour tout le run, ensuite regroupée par id_company.
+    """
+    if not company_ids:
+        return {}
+
+    db = get_db()
+    rows = db.execute(QUERY_FETCH_COMPANY_KEYWORDS, [company_ids])
+
+    by_company: dict[int, list[dict]] = {}
+    for row in rows:
+        by_company.setdefault(row["id_company"], []).append(row)
+    return by_company
+
+
+def _extract_unique_keywords(rows: list[dict], exclude_offer_id) -> list[str]:
+    """
+    Aplati et dédoublonne les mots-clés (langages, frameworks, aptitudes)
+    de toutes les offres d'une entreprise, EN EXCLUANT l'offre ciblée
+    elle-même (ces mots-clés doivent venir d'AUTRES offres, jamais de
+    celle déjà couverte par job_context).
+    """
+    keywords: set[str] = set()
+
+    for row in rows:
+        if row["id_offer"] == exclude_offer_id:
+            continue
+
+        for field in ("skills_languages", "skills_frameworks", "skills_aptitudes"):
+            value = row.get(field)
+            if not value:
+                continue
+            parts = [p.strip() for p in value.split(",")] if isinstance(value, str) else value
+            keywords.update(p for p in parts if p)
+
+    return sorted(keywords)
+
+
 def track_application_sent(records: list[tuple]) -> None:
     """
     Écrit toutes les lignes de ce run dans analytics.tracking_application
@@ -385,6 +447,14 @@ def automated_application():
         if not candidates:
             raise AirflowSkipException("Aucune offre/contact éligible à traiter ce run")
 
+        # Mots-clés des autres offres pertinentes des entreprises concernées,
+        # batchés en une seule requête pour tout le run.
+        company_ids = {
+            offer_data["job_context"]["id_company"]
+            for offer_data in candidates.values()
+        }
+        company_keywords_by_company = fetch_company_keywords(list(company_ids))
+
         skills = load_yaml(str(CONFIG_PATH / "candidate_skills.yaml"))
         email_content = load_yaml(str(CONFIG_PATH / "email_content.yaml"))
         letter_content = load_yaml(str(CONFIG_PATH / "letter_content.yaml"))
@@ -397,6 +467,18 @@ def automated_application():
 
             if not contacts:
                 continue
+
+            # Injecte les mots-clés des AUTRES offres pertinentes de cette
+            # entreprise (score > 5, < 30 jours), pour donner au LLM une
+            # meilleure compréhension des besoins de l'entreprise sans lui
+            # donner l'offre ciblée elle-même.
+            job_context = {
+                **job_context,
+                "keywords_company_needs": _extract_unique_keywords(
+                    company_keywords_by_company.get(job_context["id_company"], []),
+                    exclude_offer_id=offer_id,
+                ),
+            }
 
             # --- Lettre : générée UNE FOIS par offre, contenu neutre ---
             try:
