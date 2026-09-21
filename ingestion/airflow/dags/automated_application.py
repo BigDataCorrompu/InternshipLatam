@@ -58,6 +58,7 @@ WITH eligible_contacts AS (
     SELECT
         jo.id_offer,
         jo.job_title,
+        jo.offer_description,
         jo.published_at,
 
         c.id_company,
@@ -66,6 +67,12 @@ WITH eligible_contacts AS (
         cl.id_location,
         cl.city,
         cl.country,
+
+        jr.alternative_job_titles,
+        jr.skills_languages,
+        jr.skills_frameworks,
+        jr.skills_aptitudes,
+        jr.skills_soft,
 
         jrel.score_relevancy,
 
@@ -84,6 +91,8 @@ WITH eligible_contacts AS (
         ON jo.id_company = c.id_company
     LEFT JOIN analytics.company_location cl
         ON jo.id_location = cl.id_location
+    LEFT JOIN analytics.job_requirement jr
+        ON jr.id_offer = jo.id_offer
     JOIN analytics.job_relevancy jrel
         ON jrel.id_offer = jo.id_offer
     JOIN analytics.company_contact cc
