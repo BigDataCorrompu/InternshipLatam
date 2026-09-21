@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from langchain_core.messages import SystemMessage, HumanMessage
 
 CONTEXT = """
@@ -96,7 +96,7 @@ class FilterCriteria(BaseModel):
         Return null if not mentioned.
         """)
 
-    date_range: Literal[1, 3, 7, 14, 30, 60, 90] | None = Field(default=None, description="""
+    date_range: Literal[3, 7, 14, 30, 60, 90] | None = Field(default=None, description="""
         The number of days since the offer was posted.
         """)
 
@@ -105,11 +105,14 @@ class FilterCriteria(BaseModel):
 # EXTRACTION (un seul appel LLM)
 # ═══════════════════════════════════════════════════════════════════════
 def extract_filters(query: str, llm, session_id: str = "default") -> FilterCriteria:
-    """Extrait un FilterCriteria depuis la requête utilisateur. `llm` = ChatMistralAI (ou compatible)."""
     llm_with_cache = llm.bind(prompt_cache_key=f"dashboard-{session_id}")
     llm_extract = llm_with_cache.with_structured_output(FilterCriteria)
-    system = SystemMessage(content=CONTEXT)  
-    return llm_extract.invoke([system, HumanMessage(content=query)])
+    system = SystemMessage(content=CONTEXT)
+    try:
+        return llm_extract.invoke([system, HumanMessage(content=query)])
+    except ValidationError:
+        # Le LLM a produit une valeur hors schéma (ex: date_range invalide) — repli sûr, pas de filtre.
+        return FilterCriteria()
 
 
 # ═══════════════════════════════════════════════════════════════════════
