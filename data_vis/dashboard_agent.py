@@ -75,9 +75,7 @@ class DashboardAgent:
         for _ in range(self._max_iterations):
             try:
                 response = self._llm_with_tools.invoke(messages)
-            except Exception as e:
-                import streamlit as st
-                st.exception(e)   # 🔍 affiche l'erreur réelle, temporaire
+            except Exception:
                 return "I'm having trouble reaching the language model right now. Please try again in a moment.", history
 
             # 🔍 DEBUG temporaire — à retirer une fois le problème identifié

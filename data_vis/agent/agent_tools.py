@@ -48,6 +48,7 @@ def build_agent_tools(df, dict_reversed_index, city_country_map, get_current_fil
     def _cached_apply_filters(description: str, current_filters_key: str) -> tuple[str, dict]:
         current_filter = json.loads(current_filters_key)
         criteria = extract_filters(description, llm.fast, session_id)
+        st.write("DEBUG criteria:", criteria.model_dump())   # 🔍 ajoute cette ligne ici
         f = criteria_to_filter_dict(criteria, current_filter)
         f = _reconcile_city_country(f, city_country_map) 
         filtered = apply_filters_fn(df, f, dict_reversed_index, city_country_map)
