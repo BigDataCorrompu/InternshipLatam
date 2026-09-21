@@ -78,6 +78,13 @@ class DashboardAgent:
             except Exception:
                 return "I'm having trouble reaching the language model right now. Please try again in a moment.", history
 
+            # 🔍 DEBUG temporaire — à retirer une fois le problème identifié
+            import streamlit as st
+            st.write("DEBUG tool_calls:", [
+                {"name": c["name"], "args": c["args"]} for c in response.tool_calls
+            ] if response.tool_calls else "No tool call — direct answer")
+
+            
             messages.append(response)
             if not response.tool_calls:
                 new_history = messages[1:]
