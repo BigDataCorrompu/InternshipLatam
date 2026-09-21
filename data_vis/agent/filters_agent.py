@@ -105,7 +105,7 @@ class FilterCriteria(BaseModel):
 # EXTRACTION (un seul appel LLM)
 # ═══════════════════════════════════════════════════════════════════════
 def extract_filters(query: str, llm, session_id: str = "default") -> FilterCriteria:
-    llm_with_cache = llm.bind(prompt_cache_key=f"dashboard-{session_id}")
+    llm_with_cache = llm.bind(prompt_cache_key=f"dashboard-filters-{session_id}")
     llm_extract = llm_with_cache.with_structured_output(FilterCriteria)
     system = SystemMessage(content=CONTEXT)
     try:

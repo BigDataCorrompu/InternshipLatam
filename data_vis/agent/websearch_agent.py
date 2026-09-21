@@ -24,7 +24,7 @@ def generate_summary(state: WebSearchState, llm, session_id: str = "default") ->
                 {web_result}
                 Give a concise, factual summary."""
 
-    llm_with_cache = llm.bind(prompt_cache_key=f"dashboard-{session_id}")
+    llm_with_cache = llm.bind(prompt_cache_key=f"dashboard-websearch-{session_id}")
     try:
         response = llm_with_cache.invoke(prompt)
         return {"summary": response.content}
