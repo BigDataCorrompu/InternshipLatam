@@ -75,7 +75,9 @@ class DashboardAgent:
         for _ in range(self._max_iterations):
             try:
                 response = self._llm_with_tools.invoke(messages)
-            except Exception:
+            except Exception as e:
+                import streamlit as st
+                st.exception(e)   # 🔍 affiche l'erreur réelle, temporaire
                 return "I'm having trouble reaching the language model right now. Please try again in a moment.", history
 
             # 🔍 DEBUG temporaire — à retirer une fois le problème identifié
@@ -84,7 +86,7 @@ class DashboardAgent:
                 {"name": c["name"], "args": c["args"]} for c in response.tool_calls
             ] if response.tool_calls else "No tool call — direct answer")
 
-            
+
             messages.append(response)
             if not response.tool_calls:
                 new_history = messages[1:]
