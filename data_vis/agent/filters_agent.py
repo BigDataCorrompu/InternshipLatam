@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from langchain_core.messages import SystemMessage, HumanMessage
 
 CONTEXT = """
@@ -99,7 +99,56 @@ class FilterCriteria(BaseModel):
     date_range: Literal[3, 7, 14, 30, 60, 90] | None = Field(default=None, description="""
         The number of days since the offer was posted.
         """)
+    
+    @model_validator(mode="before")
+    @classmethod
+    def _rescue_misplaced_scalar_actions(cls, data):
+        """The LLM sometimes puts date_range/min_score/max_score/is_remote inside
+        `actions` instead of as top-level fields, despite instructions. Rescue
+        those values into the right place instead of failing validation."""
+        if not isinstance(data, dict):
+            return data
+        actions = data.get("actions")
+        if not isinstance(actions, list):
+            return data
 
+        kept_actions = []
+        for action in actions:
+            if not isinstance(action, dict):
+                kept_actions.append(action)
+                continue
+            field = action.get("field")
+            values = action.get("values")
+
+            if field == "date_range":
+                # values can arrive as int, str, or a 1-item list
+                raw = values[0] if isinstance(values, list) and values else values
+                try:
+                    data["date_range"] = int(raw)
+                except (TypeError, ValueError):
+                    pass
+                continue  # drop this action, don't keep it in the list
+
+            if field in ("min_score", "max_score"):
+                raw = values[0] if isinstance(values, list) and values else values
+                try:
+                    data[field] = float(raw)
+                except (TypeError, ValueError):
+                    pass
+                continue
+
+            if field == "is_remote":
+                raw = values[0] if isinstance(values, list) and values else values
+                if isinstance(raw, bool):
+                    data["is_remote"] = raw
+                elif isinstance(raw, str):
+                    data["is_remote"] = raw.lower() in ("true", "yes", "remote")
+                continue
+
+            kept_actions.append(action)
+
+        data["actions"] = kept_actions or None
+        return data
 
 # ═══════════════════════════════════════════════════════════════════════
 # EXTRACTION (un seul appel LLM)
