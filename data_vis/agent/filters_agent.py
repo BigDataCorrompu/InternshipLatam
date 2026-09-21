@@ -110,8 +110,9 @@ def extract_filters(query: str, llm, session_id: str = "default") -> FilterCrite
     system = SystemMessage(content=CONTEXT)
     try:
         return llm_extract.invoke([system, HumanMessage(content=query)])
-    except ValidationError:
-        # Le LLM a produit une valeur hors schéma (ex: date_range invalide) — repli sûr, pas de filtre.
+    except ValidationError as e:
+        import streamlit as st
+        st.write("DEBUG extract_filters ValidationError:", str(e))   # 🔍 temporaire
         return FilterCriteria()
 
 
