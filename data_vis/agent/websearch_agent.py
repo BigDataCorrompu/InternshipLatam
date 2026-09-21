@@ -1,5 +1,5 @@
 from typing import Literal
-
+import httpx
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage, HumanMessage
 from typing import TypedDict
@@ -13,10 +13,10 @@ class WebSearchState(TypedDict):
     summary: str
 
 
+
 def generate_summary(state: WebSearchState, llm, session_id: str = "default") -> dict:
     web_result = state.get('web_result', '')
     what_to_find = state.get('what_to_find', '')
-
     if not web_result or not web_result[0]:
         return {"summary": "No web results found."}
 
@@ -25,8 +25,11 @@ def generate_summary(state: WebSearchState, llm, session_id: str = "default") ->
                 Give a concise, factual summary."""
 
     llm_with_cache = llm.bind(prompt_cache_key=f"dashboard-{session_id}")
-    response = llm_with_cache.invoke(prompt)
-    return {"summary": response.content}
+    try:
+        response = llm_with_cache.invoke(prompt)
+        return {"summary": response.content}
+    except Exception:
+        return {"summary": "The web search assistant is temporarily unavailable (upstream error). Please try again shortly."}
 
 
 def search_web(state: WebSearchState) -> dict:
