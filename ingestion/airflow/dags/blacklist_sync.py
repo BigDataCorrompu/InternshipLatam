@@ -4,7 +4,6 @@ from airflow.exceptions import AirflowSkipException
 
 from datetime import datetime, timedelta
 import logging
-import pendulum
 from datasets import BLACKLIST
 from sheet_reader import fetch_form_responses
 
@@ -26,6 +25,7 @@ SHEET_RANGE_NAME = Variable.get(
 EMAIL_COLUMN = "Exact Email Address to be excluded"
 
 SCHEDULE = "0 13 * * *"  # une fois par jour
+
 
 
 # ___ HELPERS _________________________________________________________________
