@@ -14,16 +14,16 @@ CREATE TABLE raw.job_offer (
     api_source          VARCHAR(15)     NOT NULL,           -- "jsearch" | "careerjet"
 
     -- Offre
-    job_title       VARCHAR(150),                       -- max ~100 chars en pratique
+    job_title       TEXT,                       -- max ~100 chars en pratique
     contract_type   VARCHAR(20),                        -- "INTERN" | "FULLTIME" | null
-    job_publisher   VARCHAR(100),
+    job_publisher   VARCHAR(200),
 
     -- Entreprise
     company         VARCHAR(100),                       -- CJ max 8 chars, JS plus long
     company_website VARCHAR(200),                       -- null CJ
 
     -- Localisation
-    location_raw    VARCHAR(100),                       -- CJ "Buenos Aires" = 12 chars
+    location_raw    VARCHAR(300),                       -- CJ "Buenos Aires" = 12 chars
     city            VARCHAR(100),
     country         VARCHAR(50),
     latitude        FLOAT,                              -- null CJ
