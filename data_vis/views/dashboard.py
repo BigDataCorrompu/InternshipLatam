@@ -190,6 +190,23 @@ def convert_language_list(code_list) -> list:
 
 
 # ════════════════════════════════════════════════════════════════════
+# Country code
+# ════════════════════════════════════════════════════════════════════
+_COUNTRY_CACHE: dict[str, str] = {}
+
+def convert_country_code(code) -> str:
+    """ISO country code ('FR', 'CL', 'ARG'...) -> full name, via pycountry."""
+    c = str(code).strip().upper()
+    if not c:
+        return "Not found"
+    if c in _COUNTRY_CACHE:
+        return _COUNTRY_CACHE[c]
+    country = pycountry.countries.get(alpha_2=c) or pycountry.countries.get(alpha_3=c)
+    name = country.name if country else "Not found"
+    _COUNTRY_CACHE[c] = name
+    return name
+
+# ════════════════════════════════════════════════════════════════════
 # Main load + transform (cached — the expensive one-time preparation)
 # ════════════════════════════════════════════════════════════════════
 @st.cache_data
@@ -210,14 +227,11 @@ def load_and_transform_dataframe(fingerprint: str) -> tuple[pd.DataFrame, dict]:
     df["seniority"] = df["seniority"].fillna("unknown")
 
     # ── Full country names (only for non-null rows) ──
-    cc = coco.CountryConverter()
     mask_country = df["country"].notna()
     mask_language = df["offer_languages"].notna()
 
-    df.loc[mask_country, "country_full"] = cc.convert(
-        df.loc[mask_country, "country"].tolist(), to="name_short"
-    )
-    df["country_full"] = df["country_full"].replace("not found", np.nan)
+    df.loc[mask_country, "country_full"] = df.loc[mask_country, "country"].apply(convert_country_code)
+    df["country_full"] = df["country_full"].replace("Not found", np.nan)
 
     # ── Full language names ──
     df.loc[mask_language, "offer_languages_full"] = (
