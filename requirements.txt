@@ -8,7 +8,7 @@ psycopg2-binary>=2.9,<3
 
 # Geo / language
 country_converter
-pycountry
+pycountry==26.2.16
 rapidfuzz>=3,<4
 
 # DashboardAgent — LLM + recherche web
@@ -16,8 +16,8 @@ langchain>=1.0,<2
 langchain-core>=1.0,<2
 langchain-mistralai>=1.0,<2
 langchain-groq>=1.1.3           # fallback cloud (Ollama résout en localhost, inutilisable ici)
-langchain-google-genai          # ChatGoogleGenerativeAI (mailfinder, grounder)
-langchain-ollama                # ChatOllama (LLMprovider.py, même si non utilisé côté Streamlit)
+langchain-google-genai==4.4.2          # ChatGoogleGenerativeAI (mailfinder, grounder)
+langchain-ollama ==1.1.0                # ChatOllama (LLMprovider.py, même si non utilisé côté Streamlit)
 langchain_tavily>=0.2.18,<1     # search_web_tool
 
 # requirements-common.txt
